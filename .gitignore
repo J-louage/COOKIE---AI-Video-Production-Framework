@@ -9,9 +9,18 @@ Thumbs.db
 node_modules/
 package-lock.json
 
-# Environment files
+# Environment files (contain API keys — never commit)
 .env
-.env.*
+.env.local
 
-# Claude Code
-.claude/
+# Claude Code auto-memory (session-specific)
+.claude/memory/
+
+# Cost tracking runtime data
+_cookie/_cost/actuals/*.yaml
+_cookie/_cost/estimates/*.yaml
+_cookie/_cost/reports/*.yaml
+
+# Episode output artifacts
+episodes/*/output/
+episodes/*/assets/generated/

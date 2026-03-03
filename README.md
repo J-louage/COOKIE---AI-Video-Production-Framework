@@ -1,65 +1,126 @@
 # COOKIE — AI Video Production Framework
 
-COOKIE is an AI agent framework for Claude Code that orchestrates end-to-end video production using VEO, Nano Banana (Gemini), ElevenLabs, Remotion, and FFmpeg. It coordinates 13 specialized agents through a structured workflow engine, handling everything from initial concept to final rendered video.
+COOKIE is an AI agent framework for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that orchestrates end-to-end video production. Tell it what you want to make, and a team of 13 specialized AI agents handles everything — scripting, storyboarding, character design, video generation, voiceover, editing, and final render. No video editing experience required.
+
+## What You Can Make
+
+- **YouTube videos** — explainers, tutorials, product reviews
+- **Product demos** — screen recordings with narration and motion graphics
+- **Social content** — short-form clips for Instagram, TikTok, YouTube Shorts
+- **Brand films** — concept-driven videos with consistent characters and style
+- **Educational content** — animated walkthroughs with voiceover
+
+## Prerequisites
+
+Install these before running setup:
+
+| Tool | Minimum Version | Install |
+|------|----------------|---------|
+| Node.js | 18+ | [nodejs.org/download](https://nodejs.org/en/download) |
+| Python | 3.10+ | [python.org/downloads](https://www.python.org/downloads/) |
+| uv | any | `brew install uv` or [astral.sh/uv](https://astral.sh/uv) |
+| FFmpeg | any | `brew install ffmpeg` |
+| Claude Code | any | `npm install -g @anthropic-ai/claude-code` |
+
+### API Keys
+
+You'll need accounts with these services:
+
+| Service | What It Powers | Get a Key |
+|---------|---------------|-----------|
+| Google AI Studio | VEO video generation + Gemini image generation | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| ElevenLabs | AI narration and voice synthesis | [elevenlabs.io](https://elevenlabs.io) (Settings > API Keys) |
+
+## Installation
+
+```bash
+npx create-cookie-framework my-project
+cd my-project
+claude
+```
+
+The setup script will:
+1. Check all dependencies are installed
+2. Ask for your name and API keys
+3. Install VEO skill dependencies
+4. Configure everything automatically
+
+Then inside Claude Code:
+
+```
+/cookie-director
+```
+
+### Manual Setup
+
+If you prefer to clone and set up manually:
+
+```bash
+git clone https://github.com/J-louage/COOKIE---AI-Video-Production-Framework.git my-project
+cd my-project
+bash cookie-setup.sh
+```
 
 ## Quick Start
 
-Get your first video in 5 minutes:
+| What you want | Command | What happens |
+|---------------|---------|-------------|
+| Get guidance | `/cookie-director` | Activates Christy, the Director — she'll guide you |
+| Make a video fast | `/cookie-quick-video` | End-to-end production from a brief idea |
+| Make a social clip | `/cookie-quick-social` | Short-form video optimized for social platforms |
+| Start from a concept | `/cookie-idea` | Turns your idea into a full production script |
+| See all commands | `/cookie-help` | Lists every available command with descriptions |
+
+## How It Works
+
+### The Agent Team
+
+COOKIE coordinates 13 specialized agents, each with a distinct role:
+
+| Agent | Name | Role |
+|-------|------|------|
+| Director | Christy | Routes commands, coordinates agents, manages project flow |
+| Producer | Max | Tracks costs, budgets, generates financial reports |
+| Screenwriter | Nora | Writes and refines video scripts |
+| Storyboard Artist | Luca | Creates Scene Specification Documents (SSDs) |
+| Character Designer | Iris | Builds character identity sheets and references |
+| Prompt Engineer | Zara | Generates and optimizes image/video prompts |
+| Cinematographer | Orion | Manages VEO video generation |
+| Voice Director | Celeste | Manages ElevenLabs voice synthesis |
+| Demo Producer | Kai | Records screen captures with Playwright |
+| Sound Designer | Reed | Manages music, SFX, and audio mixing |
+| Motion Designer | Felix | Creates Remotion compositions and animations |
+| Editor | Ava | Assembles final video, renders, exports |
+| Creative Director | Nova | Brainstorms concepts, ensures brand alignment |
+
+### The 5-Phase Pipeline
 
 ```
-1. Open your project in Claude Code
-2. Run /cookie-director to activate the framework
-3. Run /cookie-quick-video to start rapid production
-4. Or run /cookie-idea to begin from a concept
+Ideation → Pre-Production → Asset Generation → Composition → Post-Production
 ```
 
-## Architecture Overview
+1. **Ideation** — Start with a concept, audio, or script. Nora (Screenwriter) transforms it into a canonical script. Nova (Creative Director) reviews for quality.
 
-COOKIE is organized into 4 modules with 13 specialized agents:
+2. **Pre-Production** — Luca (Storyboard Artist) creates a Scene Specification Document. Iris (Character Designer) builds character sheets. Zara (Prompt Engineer) generates all prompts. Max (Producer) estimates costs.
 
-### Modules
+3. **Asset Generation** — Agents generate all assets in parallel: character references, scene frames, video clips (VEO), narration (ElevenLabs), screen captures (Playwright), and music/SFX.
 
-| Module | Agents | Purpose |
-|--------|--------|---------|
-| **core** | Director (Christy), Producer (Max) | Command routing, project coordination, cost tracking |
-| **production** | Screenwriter (Nora), Storyboard Artist (Luca), Character Designer (Iris), Prompt Engineer (Zara), Cinematographer (Orion), Voice Director (Celeste), Demo Producer (Kai), Sound Designer (Reed) | Ideation through asset generation |
-| **composition** | Motion Designer (Felix), Editor (Ava) | Remotion assembly, rendering, exports |
-| **creative** | Creative Director (Nova) | Brainstorming, moodboards, brand alignment |
+4. **Composition** — Felix (Motion Designer) assembles everything into a Remotion composition with animations, text overlays, and transitions. A preview render is created for review.
 
-### By the Numbers
-
-- **13** specialized agents with distinct personas
-- **38** workflows across 5 production phases
-- **10** utility tasks
-- **8** tool skills: VEO, Nano Banana, ElevenLabs, Remotion, FFmpeg, Playwright, Image Editing, Shared
-
-## Configuration
+5. **Post-Production** — Ava (Editor) renders the final video, generates platform-specific formats, adds subtitles, creates thumbnails, and runs the final QA checklist.
 
 ### Configuration Hierarchy
 
-Settings cascade from global defaults down to episode-specific overrides:
+Settings cascade from global defaults to episode-specific overrides:
 
 ```
-_cookie/_config/global.yaml        # Framework-wide defaults
-  -> _cookie/<module>/config.yaml  # Module-level settings
-    -> project-config.yaml         # Project-level overrides
-      -> episodes/<ep>/episode-config.yaml  # Episode-specific overrides
+_cookie/_config/global.yaml        → Framework-wide defaults
+  └ _cookie/<module>/config.yaml   → Module-level settings
+    └ project-config.yaml          → Project-level overrides
+      └ episodes/<ep>/episode-config.yaml  → Episode-specific overrides
 ```
 
-Lower files override higher ones. The engine checks the full chain before using any config value.
-
-### Key Configuration Files
-
-| File | Controls |
-|------|----------|
-| `global.yaml` | Default models, cost rates, quality presets, execution mode |
-| Module `config.yaml` | Module-specific tool settings, agent defaults |
-| `project-config.yaml` | Project name, budget, target formats, character roster |
-| `episode-config.yaml` | Episode title, duration, scene count, per-episode budget |
-
-### Overriding Settings Per Episode
-
-Create or edit `episodes/<episode-name>/episode-config.yaml`. Any key defined here overrides the same key from project and global configs. Common overrides include budget, target duration, aspect ratio, and voice settings.
+Lower files override higher ones.
 
 ## Command Reference
 
@@ -162,42 +223,103 @@ Create or edit `episodes/<episode-name>/episode-config.yaml`. Any key defined he
 | `/cookie-continuity` | Check visual continuity across scenes |
 | `/cookie-validate-framework` | Scan framework for consistency |
 
-## Production Workflow
-
-COOKIE follows a 5-phase production pipeline:
-
-```
-Ideation -> Pre-Production -> Asset Generation -> Composition -> Post-Production
-```
-
-### Phase 1 — Ideation
-Start with a concept, audio recording, or raw script. The Screenwriter (Nora) transforms it into a canonical script. The Creative Director (Nova) reviews it for creative quality.
-
-### Phase 2 — Pre-Production
-The Storyboard Artist (Luca) creates a Scene Specification Document (SSD) — the central production contract. The Character Designer (Iris) builds character identity sheets. The Prompt Engineer (Zara) generates all VEO and Nano Banana prompts. The Producer (Max) estimates costs and the Director (Christy) reviews everything before proceeding.
-
-### Phase 3 — Asset Generation
-Agents generate all production assets in parallel where possible: character reference images, scene frames, video clips (via VEO), narration (via ElevenLabs), screen captures (via Playwright), and music/SFX. Assets are validated against the SSD.
-
-### Phase 4 — Composition
-The Motion Designer (Felix) assembles all assets into a Remotion composition with animations, text overlays, and transitions. Audio is synchronized with the video timeline. A low-res preview is rendered for review before committing to final render.
-
-### Phase 5 — Post-Production
-The Editor (Ava) renders the final video at full resolution, generates derived formats for different platforms (YouTube, Instagram, TikTok, etc.), adds subtitles, and creates thumbnails. A final QA checklist is completed before delivery.
-
 ## FAQ
 
+### I ran a command but nothing happened
+Make sure you're running commands inside Claude Code (the CLI), not a regular terminal. Start Claude Code with `claude` from the project directory, then type the `/cookie-*` command.
+
+### Where are my API keys stored?
+The setup script saves them to `~/.claude/.env`, which is Claude Code's standard environment file. They're loaded automatically when Claude Code starts. You can edit the file directly to update keys.
+
+### How much does it cost to make a video?
+Costs depend on the number of scenes, video clips, and narration segments. Run `/cookie-cost-estimate` after creating your Scene Specification Document to get a detailed breakdown before generating any assets. Typical short videos cost $2–10 in API calls.
+
+### Can I use COOKIE without ElevenLabs?
+Yes — narration is optional. You can create videos with just visual content and music/SFX. Skip the ElevenLabs API key during setup and the framework will work without voice synthesis.
+
 ### How do I start a new project?
-Run `/cookie-director` to activate Christy, then describe your project. She will guide you through creating a `project-config.yaml` and setting up the project structure. Alternatively, run `/cookie-idea` with your concept to jump straight into scriptwriting.
+Run `/cookie-director` to activate Christy, then describe your project. She'll guide you through setup. Or run `/cookie-idea` with your concept to jump straight into scriptwriting.
 
 ### How do I add characters?
-Run `/cookie-create-character` to create a new character identity sheet. This generates an `identity.json` with appearance traits, personality, and voice settings. Then run `/cookie-gen-char-refs` to generate multi-angle reference images for visual consistency.
+Run `/cookie-create-character` to create a character identity sheet (appearance, personality, voice). Then `/cookie-gen-char-refs` to generate multi-angle reference images for visual consistency.
 
 ### How do I create social media versions?
-Run `/cookie-quick-social` for rapid social clip generation from an existing video. Or run `/cookie-multi-export` after a final render to generate platform-specific formats (vertical 9:16 for Reels/TikTok, square 1:1 for feed posts, etc.).
+Run `/cookie-quick-social` for rapid social clips, or `/cookie-multi-export` after a final render to generate platform-specific formats (vertical 9:16 for Reels/TikTok, square 1:1 for feed posts).
 
 ### How do I track costs?
-Run `/cookie-cost-status` at any time to see current spend vs. your budget. For a detailed breakdown, run `/cookie-cost-report`. Costs are automatically logged for every VEO, Nano Banana, and ElevenLabs API call. Set your budget in `project-config.yaml`.
+Run `/cookie-cost-status` at any time. For a detailed breakdown, `/cookie-cost-report`. Costs are logged automatically for every API call. Set your budget in `project-config.yaml`.
 
 ### How do I extend an existing video?
-Run `/cookie-extend-plan` to analyze your existing video and plan new scenes. The Screenwriter will create extension scenes that maintain continuity with the original content, preserving character consistency and visual style.
+Run `/cookie-extend-plan` to analyze your existing video and plan new scenes with character and style continuity.
+
+## Troubleshooting
+
+### Setup script fails
+- Make sure you're running it from the project root: `bash cookie-setup.sh`
+- Check that all prerequisites are installed (the script will tell you what's missing)
+- On Linux, ensure `bash` is version 4+ (`bash --version`)
+
+### "Command not found" for /cookie-* commands
+- The `.claude/commands/` directory must exist in your project. If you cloned manually, make sure the `.claude/` directory was included.
+- Run `/cookie-validate-framework` to scan for broken file references.
+
+### API keys not working
+- Verify keys are in `~/.claude/.env` (not the project `.env`)
+- Check the key is correct — no extra spaces or quotes
+- For Google AI: ensure the key has access to Gemini and VEO APIs at [aistudio.google.com](https://aistudio.google.com)
+
+### npm install fails in VEO skill
+- Run manually: `cd _cookie/skills/veo && npm install`
+- Ensure Node.js 18+ is installed: `node -v`
+
+### VEO generation fails
+- Verify model ID in config matches a valid VEO model
+- Aspect ratio must be `16:9` or `9:16` — other ratios are not supported
+- VEO 3.1 max clip duration is 8 seconds
+- Check API key has sufficient quota
+
+### Cost gate halts production
+- Run `/cookie-cost-status` to see current spend vs. budget
+- Increase budget in `project-config.yaml`
+- Or switch to YOLO-UNCAPPED mode if intentional
+
+### Character inconsistency
+- Regenerate references with `/cookie-gen-char-refs`
+- Check `identity.json` for correct trait descriptions
+- Ensure all scenes reference the same character ID in the SSD
+
+### Remotion render fails
+- Requires Node.js 18+
+- Run `npm install` in the Remotion project directory
+- Verify composition ID matches `src/Root.tsx`
+- Check all asset file paths are valid
+
+## Project Structure
+
+```
+project-root/
+├── _cookie/                  # Framework (don't modify)
+│   ├── _config/              # Global configuration
+│   ├── _cost/                # Cost tracking data
+│   ├── _memory/              # Agent memory sidecars
+│   ├── core/                 # Director + Producer agents, workflow engine
+│   ├── production/           # 8 production agents and workflows
+│   ├── composition/          # Motion Designer + Editor, Remotion templates
+│   ├── creative/             # Creative Director, brainstorming
+│   └── skills/               # Tool skills (VEO, ElevenLabs, etc.)
+├── .claude/
+│   └── commands/             # All /cookie-* slash commands
+├── characters/               # Character definitions and references
+├── shared-assets/            # Cross-episode assets
+├── episodes/                 # Per-episode production files
+├── cli/                      # npx create-cookie-framework package
+├── cookie-setup.sh           # Interactive setup script
+├── .env.example              # API key template
+├── project-config.yaml       # Project-level settings
+├── CLAUDE.md                 # Framework operating manual
+└── README.md                 # This file
+```
+
+## License
+
+MIT
