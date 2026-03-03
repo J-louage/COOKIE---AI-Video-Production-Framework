@@ -1,0 +1,31 @@
+name: idea-to-script
+workflow_id: idea-to-script
+module: production
+agent: screenwriter
+slash_command: /production-idea-to-script
+description: "Transform concept/idea into canonical script"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/1-ideation/idea-to-script"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/prompt-engineering.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "script_follows_canonical_format == true"
+    - check: "all_scenes_have_visual_direction == true"
+    - check: "total_duration_within_target == true"
+
+input_file_patterns:
+  format_presets:
+    path: "{project-root}/_cookie/_config/format-presets.yaml"
+    load_strategy: "FULL_LOAD"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"

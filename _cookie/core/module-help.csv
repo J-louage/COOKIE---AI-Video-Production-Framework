@@ -1,0 +1,14 @@
+command,description,agent,phase
+cookie-director,Activate Director (Christy) — Master orchestrator,director,core
+cookie-producer,Activate Producer (Max) — Cost tracker,producer,core
+cookie-help,Context-sensitive help,director,core
+cookie-cost-estimate,Calculate cost estimate from SSD,producer,core
+cookie-cost-report,Generate final cost report,producer,core
+cookie-assets,List all generated assets with status,director,core
+cookie-format-adapt,Generate derived SSD for alternate format,director,core
+cookie-validate-ssd,Validate SSD against tool constraints,director,core
+cookie-validate-char,Validate character sheet against schema,director,core
+cookie-merge-scenes,Merge VEO clips into continuous scene,editor,core
+cookie-continuity,Check visual continuity across scenes,editor,core
+cookie-validate-framework,Scan framework for consistency,director,core
+cookie-elicit,Guided questioning for unclear requests,director,core

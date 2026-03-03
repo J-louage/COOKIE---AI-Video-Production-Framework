@@ -1,0 +1,57 @@
+name: product-demo
+description: >
+  Product demonstration template optimised for software walkthroughs, SaaS
+  feature showcases, and hardware demos. Supports screen recording integration,
+  annotation overlays (cursors, highlights, callouts), and subtitles enabled
+  by default for accessibility.
+
+format: product-demo
+aspect_ratio: "16:9"
+
+defaults:
+  fps: 30
+  width: 1920
+  height: 1080
+  min_duration_seconds: 60
+  max_duration_seconds: 180
+
+transitions:
+  default: cross-dissolve
+  supported:
+    - cross-dissolve
+    - fade-in
+    - fade-out
+    - fade-from-black
+    - fade-to-black
+    - wipe-left
+    - wipe-right
+  default_duration_frames: 15
+
+supported_overlays:
+  - lower-third
+  - title-card
+  - text-overlay
+  - caption-tiktok
+  - progress-bar
+
+screen_recording_integration: true
+annotation_overlays: true
+subtitles_default: true
+text_density: moderate
+
+scenes:
+  min: 2
+  max: 15
+  structure:
+    - type: intro
+      recommended_duration_seconds: 5-10
+      suggested_overlay: title-card
+    - type: feature-walkthrough
+      recommended_duration_seconds: 15-45
+      suggested_overlay: text-overlay
+    - type: screen-recording
+      recommended_duration_seconds: 15-60
+      suggested_overlay: text-overlay
+    - type: summary
+      recommended_duration_seconds: 5-15
+      suggested_overlay: title-card

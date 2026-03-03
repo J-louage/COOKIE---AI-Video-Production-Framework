@@ -1,0 +1,37 @@
+# COOKIE Framework — Default Style Tokens
+# Reusable tokens that can be referenced from character identity files and style guides.
+# Usage: ref:characters/_defaults/style-tokens.yaml#cinematic_styles.photorealistic
+
+cinematic_styles:
+  photorealistic: "photorealistic, cinematic lighting, 8K detail, film grain"
+  animated: "3D animated, Pixar-style, vibrant colors, expressive"
+  stylized: "stylized illustration, bold lines, limited palette"
+  documentary: "documentary-style, natural lighting, handheld camera feel"
+  corporate: "clean corporate look, professional lighting, neutral tones"
+  cinematic_dark: "dark cinematic, moody, desaturated, high contrast"
+  bright_commercial: "bright commercial look, even lighting, vivid colors, clean"
+
+lighting_presets:
+  golden_hour: "warm golden hour sunlight, long shadows, amber tones"
+  studio: "professional studio lighting, softbox key light, subtle fill"
+  natural: "natural ambient lighting, soft shadows"
+  dramatic: "dramatic chiaroscuro lighting, high contrast, deep shadows"
+  overcast: "soft overcast daylight, diffused light, minimal shadows"
+  neon: "neon-lit, cyberpunk atmosphere, color spill, reflections"
+  warm_interior: "warm interior lighting, practical lights, cozy ambiance"
+
+camera_presets:
+  portrait: "medium close-up, shallow depth of field, f/2.8"
+  full_body: "full body shot, environmental context, f/4"
+  wide: "wide establishing shot, deep focus, f/8"
+  extreme_closeup: "extreme close-up, macro detail, f/1.8"
+  over_shoulder: "over-the-shoulder shot, conversational framing"
+  aerial: "aerial drone shot, top-down perspective, wide angle"
+  tracking: "tracking shot, follow subject, steady movement"
+
+mood_presets:
+  professional: "professional, confident, polished"
+  casual: "relaxed, approachable, natural"
+  energetic: "dynamic, vibrant, high-energy"
+  serious: "contemplative, focused, somber"
+  luxurious: "elegant, premium, refined"

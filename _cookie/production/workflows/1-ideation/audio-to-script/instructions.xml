@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>audio-to-script</workflow>
+    <description>Convert audio/transcript into canonical script with visual scenes</description>
+    <agent>screenwriter</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="receive_audio">
+      <action>Receive the audio file or pre-existing transcript from the user. Identify the audio format (mp3, wav, m4a), duration, and whether a transcript is already provided. If only audio, proceed to transcription. If transcript provided, skip to analysis.</action>
+      <output>Audio file reference or raw transcript text</output>
+    </step>
+
+    <step id="2" name="transcribe_audio">
+      <action>Transcribe the audio to text with timestamps. Use word-level timestamps where possible. Preserve speaker identification if multiple voices are detected. Mark pauses, emphasis, and tone shifts. Output a timestamped transcript with speaker labels.</action>
+      <output>Timestamped transcript with speaker labels and tone annotations</output>
+    </step>
+
+    <step id="3" name="analyze_content">
+      <action>Analyze the transcript for natural topic breaks, tonal shifts, pacing changes, and logical segments. Identify the narrative arc: hook, introduction, main points, transitions, and conclusion. Map speaker segments to potential characters. Note any references to visual content mentioned in the narration.</action>
+      <output>Content analysis with segment boundaries, topic map, and narrative arc</output>
+    </step>
+
+    <step id="4" name="generate_visual_scenes">
+      <action>For each identified segment, generate a visual scene that supports the narration content. Determine scene type (character on screen, b-roll, screen recording, text overlay, animated graphic). Write detailed visual direction including setting, character actions, camera movement, and lighting. Ensure visuals reinforce or complement the spoken content rather than merely illustrating it.</action>
+      <output>Visual scene specifications for every segment</output>
+    </step>
+
+    <step id="5" name="time_align_scenes">
+      <action>Align each visual scene to its corresponding narration segment using the timestamps from transcription. Calculate scene durations based on narration timing. Ensure scene transitions align with natural pauses or topic shifts. Adjust scene boundaries to avoid cutting mid-sentence or mid-thought.</action>
+      <output>Time-aligned scene map with narration sync points</output>
+    </step>
+
+    <step id="6" name="output_canonical_script">
+      <action>Assemble the complete canonical script with pre-filled narration text from the transcript. Each scene includes: scene ID, duration (from timestamp alignment), setting, characters, visual direction (generated), and audio direction (narration text from transcript plus music/SFX suggestions). Flag any scenes with tight timing where visual complexity may exceed the allocated duration.</action>
+      <output>Complete canonical script with pre-filled narration and visual directions</output>
+    </step>
+
+    <step id="7" name="flag_tight_timing">
+      <action>Review all scenes for timing conflicts. Flag scenes where: narration pace exceeds 160 wpm, visual complexity requires more time than allocated, transitions are under 0.5 seconds, or total content exceeds the format preset maximum. Provide specific recommendations for each flagged scene.</action>
+      <output>Timing conflict report with recommendations</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Transcription accurately matches the source audio content</gate>
+    <gate>Every narration segment has a corresponding visual scene</gate>
+    <gate>Scene timestamps align with narration timing</gate>
+    <gate>Visual directions are added for every segment without exception</gate>
+    <gate>Tight timing conflicts are flagged with specific recommendations</gate>
+    <gate>Script follows canonical format template</gate>
+  </quality-gates>
+</instructions>

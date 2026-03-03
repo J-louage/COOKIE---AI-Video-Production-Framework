@@ -1,0 +1,45 @@
+# COOKIE Framework — Tool Pricing Database
+# Last updated: 2026-03-03
+# Source: Google AI docs, ElevenLabs pricing page
+# Update this file when pricing changes — all cost calculations reference it.
+
+veo:
+  veo-3.0-generate-001:                     # VEO 3.1 — 720p/1080p only, no 4K
+    fast:
+      720p: { per_second: 0.15 }
+      1080p: { per_second: 0.15 }
+    standard:
+      720p: { per_second: 0.40 }
+      1080p: { per_second: 0.40 }
+  veo-2.0-generate-001:                     # VEO 2.0 — 720p/1080p/4K
+    standard:
+      720p: { per_second: 0.35 }
+      1080p: { per_second: 0.35 }
+      4k: { per_second: 0.35 }
+  veo-2.0-generate-001-frfr:                # VEO 2.0 Interpolation — first/last frame
+    standard:
+      720p: { per_second: 0.35 }
+      1080p: { per_second: 0.35 }
+      4k: { per_second: 0.35 }
+
+nano_banana:
+  gemini-3.1-flash-image-preview:
+    512px: 0.045
+    1K: 0.067
+    2K: 0.101
+    4K: 0.151
+  gemini-3-pro-image:
+    1K: 0.134
+    2K: 0.134
+    4K: 0.240
+  gemini-2.5-flash-image:
+    1K: 0.039
+
+elevenlabs:
+  per_1000_characters: 0.30           # Depends on plan tier
+
+# Local compute — zero marginal cost
+remotion: 0.00
+ffmpeg: 0.00
+playwright: 0.00
+image_editing: 0.00

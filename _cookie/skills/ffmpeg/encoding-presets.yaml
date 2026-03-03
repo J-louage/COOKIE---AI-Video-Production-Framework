@@ -1,0 +1,248 @@
+# FFmpeg Encoding Presets
+# Pre-configured encoding settings for major social/video platforms.
+# Each preset defines codec, quality, audio, and platform-specific constraints.
+#
+# Usage: Select a preset by name and apply its ffmpeg_command template,
+# replacing {input} and {output} with actual file paths.
+
+presets:
+
+  # ──────────────────────────────────────────────
+  # YouTube 1080p (Full HD)
+  # ──────────────────────────────────────────────
+  youtube-1080p:
+    platform: "YouTube"
+    description: "YouTube Full HD upload — H.264 High Profile, slow preset for best quality-to-size ratio"
+    resolution:
+      width: 1920
+      height: 1080
+    aspect_ratio: "16:9"
+    frame_rate: 30
+    codec_settings:
+      video_codec: "libx264"
+      pixel_format: "yuv420p"
+      crf: 23
+      preset: "slow"
+      profile: "high"
+      level: "4.1"
+    audio_settings:
+      codec: "aac"
+      bitrate: "192k"
+      sample_rate: 48000
+      channels: 2
+    constraints:
+      max_bitrate: "8M"
+      bufsize: "16M"
+      max_file_size: null
+      max_duration: null
+    ffmpeg_command: >-
+      ffmpeg -i {input}
+      -c:v libx264 -pix_fmt yuv420p -crf 23 -preset slow
+      -profile:v high -level:v 4.1
+      -maxrate 8M -bufsize 16M
+      -c:a aac -b:a 192k -ar 48000 -ac 2
+      -movflags +faststart
+      {output}.mp4
+
+  # ──────────────────────────────────────────────
+  # YouTube 4K (Ultra HD)
+  # ──────────────────────────────────────────────
+  youtube-4k:
+    platform: "YouTube"
+    description: "YouTube 4K upload — H.265 (HEVC) with 10-bit color for maximum quality"
+    resolution:
+      width: 3840
+      height: 2160
+    aspect_ratio: "16:9"
+    frame_rate: 30
+    codec_settings:
+      video_codec: "libx265"
+      pixel_format: "yuv420p10le"
+      crf: 20
+      preset: "slow"
+      profile: "main10"
+      level: null
+    audio_settings:
+      codec: "aac"
+      bitrate: "256k"
+      sample_rate: 48000
+      channels: 2
+    constraints:
+      max_bitrate: null
+      bufsize: null
+      max_file_size: null
+      max_duration: null
+    ffmpeg_command: >-
+      ffmpeg -i {input}
+      -c:v libx265 -pix_fmt yuv420p10le -crf 20 -preset slow
+      -profile:v main10
+      -tag:v hvc1
+      -c:a aac -b:a 256k -ar 48000 -ac 2
+      -movflags +faststart
+      {output}.mp4
+
+  # ──────────────────────────────────────────────
+  # TikTok 720p (Vertical)
+  # ──────────────────────────────────────────────
+  tiktok-720p:
+    platform: "TikTok"
+    description: "TikTok vertical video — 9:16 portrait, H.264, optimized for mobile playback"
+    resolution:
+      width: 720
+      height: 1280
+    aspect_ratio: "9:16"
+    frame_rate: 30
+    codec_settings:
+      video_codec: "libx264"
+      pixel_format: "yuv420p"
+      crf: 23
+      preset: "medium"
+      profile: "high"
+      level: "3.1"
+    audio_settings:
+      codec: "aac"
+      bitrate: "128k"
+      sample_rate: 44100
+      channels: 2
+    constraints:
+      max_bitrate: "4M"
+      bufsize: "8M"
+      max_file_size: null
+      max_duration: 600    # 10 minutes max
+    ffmpeg_command: >-
+      ffmpeg -i {input}
+      -c:v libx264 -pix_fmt yuv420p -crf 23 -preset medium
+      -profile:v high -level:v 3.1
+      -maxrate 4M -bufsize 8M
+      -vf "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2"
+      -c:a aac -b:a 128k -ar 44100 -ac 2
+      -movflags +faststart
+      {output}.mp4
+
+  # ──────────────────────────────────────────────
+  # Instagram Reels (Vertical)
+  # ──────────────────────────────────────────────
+  instagram-reels:
+    platform: "Instagram"
+    description: "Instagram Reels — 9:16 vertical, H.264, constrained to 100MB file size limit"
+    resolution:
+      width: 1080
+      height: 1920
+    aspect_ratio: "9:16"
+    frame_rate: 30
+    codec_settings:
+      video_codec: "libx264"
+      pixel_format: "yuv420p"
+      crf: 23
+      preset: "medium"
+      profile: "high"
+      level: "4.0"
+    audio_settings:
+      codec: "aac"
+      bitrate: "128k"
+      sample_rate: 44100
+      channels: 2
+    constraints:
+      max_bitrate: null
+      bufsize: null
+      max_file_size: "100MB"
+      max_duration: 90     # 90 seconds max for Reels
+    two_pass_for_filesize: |
+      # Calculate target video bitrate for 100MB file size:
+      # target_bitrate = (file_size_bits - audio_bits) / duration
+      # Example for 60s video: (100*8*1024*1024 - 128000*60) / 60 ≈ 13.8 Mbps
+      # Pass 1:
+      ffmpeg -y -i {input} -c:v libx264 -pix_fmt yuv420p -preset medium -b:v {target_bitrate} -pass 1 -an -f null /dev/null
+      # Pass 2:
+      ffmpeg -y -i {input} -c:v libx264 -pix_fmt yuv420p -preset medium -b:v {target_bitrate} -pass 2 -c:a aac -b:a 128k -ar 44100 -movflags +faststart {output}.mp4
+    ffmpeg_command: >-
+      ffmpeg -i {input}
+      -t 90
+      -c:v libx264 -pix_fmt yuv420p -crf 23 -preset medium
+      -profile:v high -level:v 4.0
+      -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"
+      -c:a aac -b:a 128k -ar 44100 -ac 2
+      -movflags +faststart
+      {output}.mp4
+
+  # ──────────────────────────────────────────────
+  # Instagram Square (Feed Post)
+  # ──────────────────────────────────────────────
+  instagram-square:
+    platform: "Instagram"
+    description: "Instagram square feed post — 1:1 aspect ratio, H.264, universal feed format"
+    resolution:
+      width: 1080
+      height: 1080
+    aspect_ratio: "1:1"
+    frame_rate: 30
+    codec_settings:
+      video_codec: "libx264"
+      pixel_format: "yuv420p"
+      crf: 23
+      preset: "medium"
+      profile: "high"
+      level: "4.0"
+    audio_settings:
+      codec: "aac"
+      bitrate: "128k"
+      sample_rate: 44100
+      channels: 2
+    constraints:
+      max_bitrate: null
+      bufsize: null
+      max_file_size: null
+      max_duration: 60     # 60 seconds max for feed
+    ffmpeg_command: >-
+      ffmpeg -i {input}
+      -t 60
+      -c:v libx264 -pix_fmt yuv420p -crf 23 -preset medium
+      -profile:v high -level:v 4.0
+      -vf "scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2"
+      -c:a aac -b:a 128k -ar 44100 -ac 2
+      -movflags +faststart
+      {output}.mp4
+
+  # ──────────────────────────────────────────────
+  # Twitter/X Video
+  # ──────────────────────────────────────────────
+  twitter-video:
+    platform: "Twitter/X"
+    description: "Twitter/X video upload — H.264, slightly higher CRF for smaller files, 512MB limit"
+    resolution:
+      width: 1920
+      height: 1080
+    aspect_ratio: "16:9"
+    frame_rate: 30
+    codec_settings:
+      video_codec: "libx264"
+      pixel_format: "yuv420p"
+      crf: 25
+      preset: "medium"
+      profile: "high"
+      level: "4.1"
+    audio_settings:
+      codec: "aac"
+      bitrate: "128k"
+      sample_rate: 44100
+      channels: 2
+    constraints:
+      max_bitrate: null
+      bufsize: null
+      max_file_size: "512MB"
+      max_duration: 140    # 2 minutes 20 seconds
+    two_pass_for_filesize: |
+      # Calculate target video bitrate for 512MB file size:
+      # target_bitrate = (file_size_bits - audio_bits) / duration
+      # Pass 1:
+      ffmpeg -y -i {input} -c:v libx264 -pix_fmt yuv420p -preset medium -b:v {target_bitrate} -pass 1 -an -f null /dev/null
+      # Pass 2:
+      ffmpeg -y -i {input} -c:v libx264 -pix_fmt yuv420p -preset medium -b:v {target_bitrate} -pass 2 -c:a aac -b:a 128k -ar 44100 -movflags +faststart {output}.mp4
+    ffmpeg_command: >-
+      ffmpeg -i {input}
+      -t 140
+      -c:v libx264 -pix_fmt yuv420p -crf 25 -preset medium
+      -profile:v high -level:v 4.1
+      -c:a aac -b:a 128k -ar 44100 -ac 2
+      -movflags +faststart
+      {output}.mp4

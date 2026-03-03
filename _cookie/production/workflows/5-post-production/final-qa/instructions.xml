@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>final-qa</workflow>
+    <description>Perform comprehensive quality assurance on all final exports and generate QA report</description>
+    <agent>editor</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="probe_all_exports">
+      <action>For each export file (final render and all format variants), run ffprobe to extract technical metadata. Collect: duration, resolution, aspect ratio, codec, pixel format, frame rate, bitrate, audio codec, audio sample rate, audio channels, and file size. Compare each value against the expected specifications from the SSD and format export configuration. Flag any mismatches.</action>
+      <output>Technical metadata report for all exports</output>
+    </step>
+
+    <step id="2" name="verify_audio_levels">
+      <action>Measure audio levels for each export using FFmpeg loudnorm filter or ebur128 filter. Verify integrated loudness is within 1 LU of the -14 LUFS target. Verify true peak does not exceed -1dBTP. Check for audio silence gaps longer than 2 seconds (which may indicate missing narration). Check for audio clipping events. Flag any exports that fail audio level requirements.</action>
+      <output>Audio level verification report per export</output>
+    </step>
+
+    <step id="3" name="check_for_black_frames">
+      <action>Scan each export for unexpected black frames using FFmpeg blackdetect filter: ffmpeg -i {file} -vf "blackdetect=d=0.5:pix_th=0.10" -f null -. Black frames at the very start (up to 0.5s) or end (up to 1s) are acceptable for fade transitions. Flag any black frame sequences in the middle of the video that are not part of intentional fade-to-black transitions defined in the SSD.</action>
+      <output>Black frame detection report per export</output>
+    </step>
+
+    <step id="4" name="verify_resolution_and_aspect">
+      <action>Verify each export has the exact resolution and aspect ratio specified for its target platform. Check that no unintended letterboxing or pillarboxing was added. Verify pixel aspect ratio is 1:1 (square pixels). For cropped formats, verify the crop was applied correctly by checking the display aspect ratio matches the target.</action>
+      <output>Resolution and aspect ratio verification per export</output>
+    </step>
+
+    <step id="5" name="verify_file_size">
+      <action>Check file size for each export against platform limits and expected ranges. YouTube: no specific limit but flag if over 2GB. Instagram: flag if over 650MB. TikTok: flag if over 287MB. Verify file size is proportional to duration and resolution (not suspiciously small indicating corruption or quality issues). Flag any exports outside expected size ranges.</action>
+      <output>File size verification report per export</output>
+    </step>
+
+    <step id="6" name="verify_subtitles">
+      <action>Verify subtitle files (SRT, VTT) exist and are valid. Parse each subtitle file and check: sequential numbering (SRT), valid timestamp formatting, no overlapping timestamps, text content matches narration from the SSD, no empty subtitle entries, and character count per line does not exceed 42. For exports with burned-in subtitles, spot-check subtitle visibility and timing at random points.</action>
+      <output>Subtitle verification report</output>
+    </step>
+
+    <step id="7" name="generate_qa_report">
+      <action>Compile all verification results into a comprehensive QA report. For each export, provide a pass/fail status with details on any failures. Include a summary table with: export name, resolution, duration, file size, audio levels, and overall status. Save the QA report to episodes/{episode_id}/exports/qa-report-{timestamp}.yaml. If any critical checks failed, flag the episode as requiring attention before distribution.</action>
+      <output>Comprehensive QA report saved to exports/</output>
+    </step>
+
+    <step id="8" name="invoke_cost_report">
+      <action>Invoke the cost report task (T3) to generate the final episode cost summary. Pass the episode ID and the total asset generation costs collected throughout the production pipeline. The cost report should include: total API costs (VEO, audio generation, image generation), compute costs (render time), and a breakdown by production phase. This completes the production pipeline.</action>
+      <output>Cost report task invoked with episode production costs</output>
+    </step>
+
+    <step id="9" name="gate">
+      <action>If any critical QA failures are found, HALT the pipeline. Present the QA report to the user and require explicit approval before marking the episode as complete. Only proceed to distribution if all critical checks pass.</action>
+      <output>Pipeline gate decision: proceed to distribution or halt for review</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All exports probed with ffprobe and metadata matches specifications</gate>
+    <gate>Audio levels within 1 LU of -14 LUFS target for all exports</gate>
+    <gate>True peak does not exceed -1dBTP for any export</gate>
+    <gate>No unexpected black frames detected in any export</gate>
+    <gate>Resolution and aspect ratio match platform specifications exactly</gate>
+    <gate>File sizes within platform limits and expected ranges</gate>
+    <gate>Subtitle files valid with correct formatting and timing</gate>
+    <gate>QA report generated and saved to exports/</gate>
+    <gate>Cost report task T3 invoked successfully</gate>
+  </quality-gates>
+</instructions>

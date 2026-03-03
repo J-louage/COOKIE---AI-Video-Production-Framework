@@ -1,0 +1,6 @@
+# COOKIE Core Module Configuration
+module_name: "core"
+inherits: "_config/global.yaml"
+agents: ["director", "producer"]
+tasks_path: "tasks/"
+engine_path: "engine/"

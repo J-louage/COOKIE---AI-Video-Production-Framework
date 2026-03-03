@@ -1,0 +1,36 @@
+# COOKIE Framework — Resolution Profiles
+# Each profile defines quality settings for all tools in the pipeline.
+# Referenced by: global.yaml (default_resolution_profile), episode-config.yaml (overrides)
+
+profiles:
+  draft:
+    description: "For previews and rapid iteration"
+    veo_resolution: "720p"
+    nano_banana_resolution: "1K"
+    remotion_width: 1280
+    remotion_height: 720
+    ffmpeg_crf: 28
+
+  standard:
+    description: "Good balance of quality and cost"
+    veo_resolution: "720p"
+    nano_banana_resolution: "2K"
+    remotion_width: 1920
+    remotion_height: 1080
+    ffmpeg_crf: 23
+
+  hd:
+    description: "High quality, 1080p VEO (all models)"
+    veo_resolution: "1080p"
+    nano_banana_resolution: "2K"
+    remotion_width: 1920
+    remotion_height: 1080
+    ffmpeg_crf: 20
+
+  4k:
+    description: "Maximum quality (VEO 2.0 only — VEO 3.1 max is 1080p)"
+    veo_resolution: "4k"
+    nano_banana_resolution: "4K"
+    remotion_width: 3840
+    remotion_height: 2160
+    ffmpeg_crf: 18

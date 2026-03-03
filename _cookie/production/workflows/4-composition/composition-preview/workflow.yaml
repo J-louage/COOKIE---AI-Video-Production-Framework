@@ -1,0 +1,29 @@
+name: composition-preview
+workflow_id: composition-preview
+module: production
+agent: motion-designer
+slash_command: /production-composition-preview
+description: "Render a low-resolution preview of the composition for review and approval"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/4-composition/composition-preview"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/remotion/SKILL.md"
+
+input_file_patterns:
+  remotion_project:
+    path: "{project-root}/episodes/{episode_id}/composition/"
+    load_strategy: "INDEX_GUIDED"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "render_config_set_low_res == true"
+    - check: "preview_rendered_successfully == true"
+    - check: "preview_presented_for_review == true"
+    - check: "approval_gate_passed == true"

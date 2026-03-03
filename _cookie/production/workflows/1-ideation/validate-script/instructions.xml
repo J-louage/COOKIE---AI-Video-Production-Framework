@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>validate-script</workflow>
+    <description>Validate and normalize user-provided script to canonical format</description>
+    <agent>screenwriter</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="receive_user_script">
+      <action>Receive the user-provided script in whatever format it arrives: markdown, plain text, structured document, or partial outline. Identify the input format and note any non-standard formatting.</action>
+      <output>Raw user script with format identification notes</output>
+    </step>
+
+    <step id="2" name="parse_format">
+      <action>Parse the user script to extract identifiable elements: title, scenes, narration text, visual notes, audio notes, character references, duration hints, and any metadata. Map each extracted element to its canonical counterpart.</action>
+      <output>Parsed element map linking user format to canonical fields</output>
+    </step>
+
+    <step id="3" name="normalize_to_canonical">
+      <action>Transform the parsed elements into canonical script format. Apply the standard template structure: header block, scene blocks with sequential IDs, visual direction sections, audio direction sections, and metadata footer. Preserve all user intent while reformatting.</action>
+      <output>Normalized canonical script draft</output>
+    </step>
+
+    <step id="4" name="validate_required_sections">
+      <action>Check that all required sections are present in the normalized script: title, episode ID, format type, target duration, character list, and at least one complete scene block. For each scene, verify: scene ID, duration, setting, characters, visual direction, and audio direction. Flag any missing sections.</action>
+      <output>Section validation report listing present and missing sections</output>
+    </step>
+
+    <step id="5" name="check_character_names">
+      <action>Extract all character names referenced in the script. Cross-reference against the characters directory index. For each character: confirm identity.json exists, confirm the name matches, and convert references to [character:X] placeholder syntax. Flag any unresolved character names for user clarification.</action>
+      <output>Character resolution report with resolved and unresolved names</output>
+    </step>
+
+    <step id="6" name="check_timing_feasibility">
+      <action>For each scene, validate that the narration word count fits within the allocated duration at standard speech rates (150 wpm conversational, 130 wpm dramatic). Check that total duration matches format preset constraints. Flag scenes where narration exceeds available time or where visual pacing is too compressed.</action>
+      <output>Timing feasibility report with per-scene analysis</output>
+    </step>
+
+    <step id="7" name="flag_ambiguous_directions">
+      <action>Scan all visual and audio directions for ambiguous or underspecified instructions. Flag directions that lack camera specifics, lighting details, or concrete action descriptions. Flag audio directions missing voice tone, music mood, or SFX timing. Suggest improvements for each flagged item.</action>
+      <output>Ambiguity report with specific improvement suggestions</output>
+    </step>
+
+    <step id="8" name="output_normalized_script">
+      <action>Produce the final normalized canonical script incorporating all fixes and flags. Generate a companion validation report summarizing: sections validated, characters resolved, timing analysis, ambiguities flagged, and overall readiness score. Save both documents.</action>
+      <output>Normalized canonical script and validation report</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All required sections are present in the canonical format</gate>
+    <gate>Format matches the canonical script template exactly</gate>
+    <gate>All character names are resolved against the characters directory</gate>
+    <gate>Timing is feasible for all scenes based on narration word count</gate>
+    <gate>No critical ambiguities remain in visual or audio directions</gate>
+    <gate>Validation report is complete and attached</gate>
+  </quality-gates>
+</instructions>

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>create-scene-spec</workflow>
+    <description>Create Scene Specification Document (SSD) from canonical script</description>
+    <agent>storyboard-artist</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_inputs">
+      <action>Load all required inputs: canonical script (scene list with directions), format preset (duration and platform constraints), character identities (prompt tokens and appearance data), style guide (style tokens and negative prompts), and VEO constraints (model limits, supported durations, resolution options, input modes). Verify all inputs are present before proceeding.</action>
+      <output>All input data loaded and verified</output>
+    </step>
+
+    <step id="2" name="process_each_scene">
+      <action>For each scene in the canonical script, begin building the SSD entry. Determine: scene_type (veo-generated, nano-banana-still, screen-recording, narration-only, composite), priority level (P0 critical, P1 important, P2 nice-to-have), and whether this scene requires short_form_hook treatment (appears in first 3 seconds).</action>
+      <output>Scene type and priority classification for all scenes</output>
+    </step>
+
+    <step id="3" name="calculate_durations">
+      <action>For each scene, calculate precise duration in seconds. Compare against VEO model constraints: maximum single clip duration (typically 8 seconds for standard models). If a scene exceeds the max clip duration, flag it for multi-clip splitting in the next step. Validate that all durations are within model-supported ranges.</action>
+      <output>Duration calculations with multi-clip flags</output>
+    </step>
+
+    <step id="4" name="plan_multi_clip_splits">
+      <action>For scenes exceeding 8 seconds, plan multi-clip splits following these rules: First clip uses text-to-video or image-to-video input mode. Middle clips use interpolation mode (first-frame extracted from previous clip's last frame via Nano Banana or ffmpeg, last-frame generated via Nano Banana). Last clip uses image-to-video mode. All clips in a multi-clip scene share merge_strategy: ffmpeg-concat. Calculate individual clip durations to sum to the scene total. Ensure visual continuity by specifying frame extraction points.</action>
+      <output>Multi-clip split plans with frame continuity specifications</output>
+    </step>
+
+    <step id="5" name="build_veo_config">
+      <action>For each scene/clip, build the complete VEO configuration: model (veo-2 or veo-3), input_mode (text-to-video, image-to-video, interpolation), duration_seconds, resolution, aspect_ratio, speed (normal, slow-mo, timelapse), person_generation (on/off), reference_images (character reference paths using [character:X] placeholders), prompt (with [character:X] and [outfit:Y] placeholders for later expansion), and negative_prompt. Validate each config against VEO constraints.</action>
+      <output>VEO configuration for every scene and clip</output>
+    </step>
+
+    <step id="6" name="build_audio_config">
+      <action>For each scene, build the audio configuration: narration (text, character voice, timing), music (track reference or mood description, volume level, fade in/out), sfx (effect list with timestamps and durations), and silence (intentional silent segments). Map audio timing to video clip boundaries.</action>
+      <output>Audio configuration for every scene</output>
+    </step>
+
+    <step id="7" name="build_remotion_config">
+      <action>For each scene, build the Remotion composition configuration: composition_id, duration_in_frames (at target fps), fps, width, height, layer order (video, narration, music, sfx, text overlays), text overlay specifications (content, position, font, timing), and transition effects to adjacent scenes.</action>
+      <output>Remotion configuration for every scene</output>
+    </step>
+
+    <step id="8" name="calculate_costs">
+      <action>For each scene/clip, calculate estimated generation cost based on: VEO API pricing per second of video, Nano Banana pricing per image generation, number of reference images needed, number of first/last frame generations, and any re-generation buffer (typically 1.5x). Sum per-scene costs for total episode cost estimate.</action>
+      <output>Per-scene and total cost estimates</output>
+    </step>
+
+    <step id="9" name="build_complete_ssd">
+      <action>Assemble the complete Scene Specification Document (SSD) as a YAML file. Structure: metadata (episode_id, title, format, total_duration, total_cost_estimate, created_at), global_config (style_guide_ref, default_resolution, default_aspect_ratio), and scenes array with each scene containing: scene_id, scene_type, priority, duration, clips array (with veo_config, frame_sources), audio_config, remotion_config, and cost_estimate.</action>
+      <output>Complete SSD YAML document</output>
+    </step>
+
+    <step id="10" name="validate_ssd">
+      <action>Run T6 SSD validation against the complete document. Check: schema compliance, all required fields present, duration totals match, multi-clip scenes properly structured, VEO configs valid per model constraints, cost estimates present, character references valid, and no orphaned dependencies. Fix any validation errors.</action>
+      <output>T6 validation report (pass/fail with details)</output>
+    </step>
+
+    <step id="11" name="save_ssd">
+      <action>Save the validated SSD to episodes/{episode_id}/ssd/scene-spec.yaml. Create a backup copy with timestamp. Log the SSD version, scene count, clip count, and total cost estimate.</action>
+      <output>Saved SSD file with backup and metadata</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>SSD validates against the scene-spec schema without errors</gate>
+    <gate>Every scene has complete VEO, audio, and Remotion configuration</gate>
+    <gate>All durations are valid for the specified VEO model</gate>
+    <gate>Multi-clip scenes (over 8s) are properly split with continuity planning</gate>
+    <gate>Multi-clip scenes use correct input modes: first=text/image-to-video, middle=interpolation, last=image-to-video</gate>
+    <gate>All multi-clip scenes have merge_strategy: ffmpeg-concat</gate>
+    <gate>Cost estimate is included for every scene and clip</gate>
+    <gate>Total cost estimate calculated for the entire episode</gate>
+    <gate>T6 validation passes without errors</gate>
+  </quality-gates>
+</instructions>

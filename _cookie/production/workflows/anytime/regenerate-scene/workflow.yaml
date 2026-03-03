@@ -1,0 +1,26 @@
+name: regenerate-scene
+workflow_id: regenerate-scene
+module: production
+agent: cinematographer
+slash_command: /production-regenerate-scene
+description: "Regenerate specific scene(s) with revised prompts, cost tracking, and retake counting"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/anytime/regenerate-scene"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/veo/SKILL.md"
+  - "{project-root}/_cookie/skills/nano-banana/SKILL.md"
+  - "{project-root}/_cookie/skills/ffmpeg/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "scene_regenerated == true"
+    - check: "cost_logged_as_retake == true"
+    - check: "retake_limit_checked == true"
+    - check: "asset_qa_passed == true"

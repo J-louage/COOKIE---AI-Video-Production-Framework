@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>generate-character-refs</workflow>
+    <description>Generate multi-angle character reference images via Nano Banana</description>
+    <agent>character-designer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_character_identities">
+      <action>Load the SSD to identify all characters referenced across all scenes. For each character, load their identity.json to retrieve: prompt_tokens (core_identity, style_modifiers, negative_tokens, consistency_anchors), active style, active outfit, and any existing reference images. Build the character generation queue.</action>
+      <output>Character generation queue with identity data</output>
+    </step>
+
+    <step id="2" name="generate_angle_views">
+      <action>For each character in the queue, generate reference images for four standard angles: front view, side view (left profile), back view, and three-quarter view. For each angle: build the Nano Banana prompt by combining core_identity tokens with angle-specific direction (e.g., "front-facing portrait, direct eye contact" for front), set resolution to match the project's reference image standard, apply the cost gate (check remaining budget before each generation), call the Nano Banana API, log the cost, and save to characters/{char-id}/styles/{style}/reference-{angle}.png.</action>
+      <output>Four angle reference images per character per style</output>
+    </step>
+
+    <step id="3" name="generate_outfit_views">
+      <action>For each character with multiple outfits defined, generate additional reference images showing each outfit. Use front and three-quarter angles at minimum for outfit variants. Build prompts by combining core_identity tokens with outfit-specific tokens. Save to characters/{char-id}/styles/{style}/outfits/{outfit-id}/reference-{angle}.png.</action>
+      <output>Outfit variant reference images</output>
+    </step>
+
+    <step id="4" name="generate_composite_sheet">
+      <action>For each character, create a composite reference sheet that arranges all angle views in a single image grid: front (top-left), three-quarter (top-right), side (bottom-left), back (bottom-right). Add the character name and style label as text annotations. Save as characters/{char-id}/styles/{style}/composite-sheet.png. This sheet serves as a quick visual reference for consistency checking.</action>
+      <output>Composite reference sheet per character per style</output>
+    </step>
+
+    <step id="5" name="validate_consistency">
+      <action>Review all generated reference images for visual consistency: verify that facial features match across all angles, clothing is consistent, color palette matches the style guide, proportions are correct, and no AI artifacts are present (extra limbs, distorted features, inconsistent details). Flag any images that need regeneration.</action>
+      <output>Consistency validation report with pass/fail per image</output>
+    </step>
+
+    <step id="6" name="mark_complete">
+      <action>Update each character's status from "pending-references" to "references-complete" in their identity.json. Log the total cost for all character reference generations. Update the dependency graph to mark character-refs as complete, unblocking downstream first-frame and video generation tasks.</action>
+      <output>Character status updated, dependency graph updated, cost logged</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All four standard angles generated for every character (front, side, back, three-quarter)</gate>
+    <gate>Reference images are visually consistent across all angles</gate>
+    <gate>Composite reference sheet created for every character and style</gate>
+    <gate>All files saved at the correct directory paths</gate>
+    <gate>No AI artifacts present in any reference image</gate>
+    <gate>Outfit variants generated for characters with multiple outfits</gate>
+    <gate>Total generation cost logged and within budget</gate>
+  </quality-gates>
+</instructions>

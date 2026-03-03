@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>subtitle-generation</workflow>
+    <description>Generate subtitle files (SRT, VTT) from narration text and optionally burn them into the video</description>
+    <agent>editor</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="extract_narration_text_and_timing">
+      <action>Extract narration text and timing data from the SSD. For each narration segment, collect: the spoken text content, start timestamp, end timestamp, and associated scene ID. Verify all narration segments have valid text and timing. Sort segments chronologically. Calculate total narration coverage as a percentage of video duration.</action>
+      <output>Ordered narration segments with text and timestamps</output>
+    </step>
+
+    <step id="2" name="generate_srt">
+      <action>Generate an SRT (SubRip) subtitle file from the narration segments. Format each entry with: sequential index number, timestamp range (HH:MM:SS,mmm format), and subtitle text. Split long narration segments into multiple subtitle entries (maximum 2 lines, maximum 42 characters per line). Ensure no subtitle displays for longer than 7 seconds. Save to episodes/{episode_id}/exports/subtitles/{episode_id}.srt.</action>
+      <output>SRT subtitle file</output>
+    </step>
+
+    <step id="3" name="generate_vtt">
+      <action>Generate a WebVTT subtitle file from the same narration segments. Include the WEBVTT header. Format timestamps in HH:MM:SS.mmm format. Apply the same line-splitting rules as the SRT. Optionally include position and alignment cues for styled web playback. Save to episodes/{episode_id}/exports/subtitles/{episode_id}.vtt.</action>
+      <output>VTT subtitle file</output>
+    </step>
+
+    <step id="4" name="word_level_timing">
+      <action>If word-level timing is enabled in the SSD configuration, generate word-level subtitle variants. Break each narration segment into individual words with interpolated timing based on word length and speaking rate. Create word-level SRT and VTT files with the suffix "-words" (e.g., {episode_id}-words.srt). This enables karaoke-style highlighting in supported players.</action>
+      <output>Word-level subtitle files (if enabled)</output>
+    </step>
+
+    <step id="5" name="optional_burn_in">
+      <action>If burn-in subtitles are requested in the configuration, overlay subtitles onto the video using FFmpeg. Use the subtitles filter with the generated SRT file: ffmpeg -i input.mp4 -vf "subtitles={srt-file}:force_style='FontSize=24,PrimaryColour=white,OutlineColour=black,Outline=2,Shadow=1,MarginV=40'" output.mp4. Configure font, size, color, outline, and position per the brand style guide. Save the burned-in version alongside the clean version.</action>
+      <output>Video with burned-in subtitles (if requested)</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All narration segments extracted with valid text and timing</gate>
+    <gate>SRT file generated with correct formatting and sequential indices</gate>
+    <gate>VTT file generated with WEBVTT header and correct formatting</gate>
+    <gate>Subtitle lines do not exceed 42 characters or 2 lines per entry</gate>
+    <gate>No subtitle displays for longer than 7 seconds</gate>
+    <gate>Word-level timing files generated if enabled</gate>
+    <gate>Burn-in subtitles rendered correctly if requested</gate>
+    <gate>Subtitle timing aligns with narration audio</gate>
+  </quality-gates>
+</instructions>

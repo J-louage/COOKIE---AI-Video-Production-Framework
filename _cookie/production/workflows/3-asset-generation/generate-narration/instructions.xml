@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>generate-narration</workflow>
+    <description>Generate narration audio via ElevenLabs API</description>
+    <agent>voice-director</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_ssd_and_extract_narration">
+      <action>Load the SSD and extract all scenes that contain narration in their audio configuration. For each narration scene, collect: scene_id, narration text, character delivering the narration, timing requirements (target duration), and any speaking style notes (pace, tone, emphasis).</action>
+      <output>Narration scene queue with text and timing data</output>
+    </step>
+
+    <step id="2" name="load_voice_configs">
+      <action>For each character delivering narration, load their voice-config.json from characters/{char-id}/voice-config.json. Extract: voice_id (ElevenLabs voice identifier), voice_settings (stability, similarity_boost, style, speed), speaking_style preference, and any per-scene voice adjustments noted in the SSD.</action>
+      <output>Voice configuration loaded for all narrating characters</output>
+    </step>
+
+    <step id="3" name="build_elevenlabs_requests">
+      <action>For each narration segment, build the ElevenLabs API request: select the voice_id from the character's config, set voice_settings (stability, similarity_boost, style exaggeration), set the model (eleven_multilingual_v2 or eleven_monolingual_v1 based on language), include the narration text with any SSML markup for emphasis or pauses, and set the output format (mp3_44100_128 for standard quality).</action>
+      <output>ElevenLabs API requests for all narration segments</output>
+    </step>
+
+    <step id="4" name="call_elevenlabs_api">
+      <action>Submit each ElevenLabs API request. Handle responses: success (download audio), rate limiting (wait and retry), generation failure (retry with adjusted settings). Log the cost per generation (based on character count). Note: narration generation can run in parallel with video generation since there are no dependencies between them.</action>
+      <output>Generated narration audio files</output>
+    </step>
+
+    <step id="5" name="save_narration_audio">
+      <action>Save each narration audio file to episodes/{episode_id}/assets/audio/{scene_id}/narration.mp3. Create a companion metadata file with: scene_id, character_id, voice_id, text_length, audio_duration, cost, generated_at, and settings used.</action>
+      <output>Saved narration files with metadata</output>
+    </step>
+
+    <step id="6" name="verify_quality_and_duration">
+      <action>For each generated narration: verify audio is clean (no artifacts, clipping, or background noise), verify the speaking pace matches the character's style, verify the duration is reasonable for the narration text length (compare against expected speech rate), and verify the audio aligns with the scene's timing requirements. Flag any narration where duration significantly exceeds the scene's allocated time.</action>
+      <output>Quality and duration verification report</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All narration segments from the SSD are generated</gate>
+    <gate>Voice matches the character's voice configuration (voice_id and settings)</gate>
+    <gate>Audio is clean with no artifacts, clipping, or background noise</gate>
+    <gate>Narration duration is reasonable for the text length and scene timing</gate>
+    <gate>Speaking pace and tone match the character's speaking style</gate>
+    <gate>Generation costs logged for all segments</gate>
+  </quality-gates>
+</instructions>

@@ -1,0 +1,23 @@
+name: brand-alignment-review
+workflow_id: brand-alignment-review
+module: creative
+agent: creative-director
+slash_command: /creative-brand-alignment-review
+description: "Review assets against brand guidelines using a structured scoring rubric"
+config_source: "{project-root}/_cookie/creative/config.yaml"
+installed_path: "{project-root}/_cookie/creative/workflows/brand-alignment-review"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/color-theory.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "rubric_scored == true"
+    - check: "recommendations_provided == true"
+    - check: "approval_gate_evaluated == true"

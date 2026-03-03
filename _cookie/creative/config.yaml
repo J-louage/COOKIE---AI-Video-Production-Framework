@@ -1,0 +1,5 @@
+# COOKIE Creative Module Configuration
+module_name: "creative"
+inherits: "_config/global.yaml"
+agents: ["creative-director"]
+data_path: "data/"

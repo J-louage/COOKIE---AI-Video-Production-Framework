@@ -1,0 +1,41 @@
+{
+  "palette": {
+    "primary": {
+      "hex": "",
+      "rgb": "",
+      "usage": "Main brand color — headers, CTAs, key elements"
+    },
+    "secondary": {
+      "hex": "",
+      "rgb": "",
+      "usage": "Supporting color — backgrounds, secondary elements"
+    },
+    "accent": {
+      "hex": "",
+      "rgb": "",
+      "usage": "Highlight color — emphasis, links, interactive elements"
+    },
+    "background": {
+      "hex": "",
+      "rgb": "",
+      "usage": "Default background color"
+    },
+    "text": {
+      "hex": "",
+      "rgb": "",
+      "usage": "Primary text color"
+    },
+    "text_secondary": {
+      "hex": "",
+      "rgb": "",
+      "usage": "Secondary text, captions, subtitles"
+    }
+  },
+  "gradients": {
+    "primary_gradient": {
+      "type": "linear",
+      "direction": "to right",
+      "stops": []
+    }
+  }
+}

@@ -1,0 +1,32 @@
+name: generate-narration
+workflow_id: generate-narration
+module: production
+agent: voice-director
+slash_command: /production-generate-narration
+description: "Generate narration audio via ElevenLabs API"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/3-asset-generation/generate-narration"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/elevenlabs/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "all_narration_generated == true"
+    - check: "voice_matches_character_config == true"
+    - check: "audio_clean == true"
+    - check: "duration_reasonable == true"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"

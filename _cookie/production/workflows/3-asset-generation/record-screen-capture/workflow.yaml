@@ -1,0 +1,31 @@
+name: record-screen-capture
+workflow_id: record-screen-capture
+module: production
+agent: demo-producer
+slash_command: /production-record-screen-capture
+description: "Capture screen recordings via Playwright"
+priority: P1
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/3-asset-generation/record-screen-capture"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/playwright/SKILL.md"
+  - "{project-root}/_cookie/skills/image-editing/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "recordings_match_ssd_config == true"
+    - check: "actions_executed_correctly == true"
+    - check: "annotations_positioned == true"
+    - check: "resolution_correct == true"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"

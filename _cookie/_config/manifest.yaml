@@ -1,0 +1,6 @@
+manifests:
+  agents: "agent-manifest.csv"
+  workflows: "workflow-manifest.csv"
+  tasks: "task-manifest.csv"
+  skills: "skill-manifest.csv"
+  commands: "cookie-help.csv"

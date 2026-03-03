@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>brainstorm-concept</workflow>
+    <description>Brainstorm 3-5 distinct video concepts from a brief or topic</description>
+    <agent>creative-director</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="receive_brief">
+      <action>Receive the brief, topic, or rough idea from the user. Clarify the target audience, brand context, and any constraints (duration, format, budget). If a brand config exists at characters/brand/brand-config.json, load it for brand alignment. Check existing episode history to avoid repeating concepts from previous episodes.</action>
+      <output>Clear brief with audience, brand context, and constraints</output>
+    </step>
+
+    <step id="2" name="load_creative_data">
+      <action>Load creative reference data files to inform concept generation: cinematic-styles.csv for visual style options, color-palettes.csv for palette suggestions, music-mood-mapping.csv for audio direction, and transition-library.csv for pacing ideas. Also load the color-theory skill for palette design guidance. If a style guide exists for the project, load it to ensure concepts align with established visual direction.</action>
+      <output>Creative reference data loaded for concept generation</output>
+    </step>
+
+    <step id="3" name="generate_concepts">
+      <action>Generate 3-5 distinct video concepts. Each concept must be a genuinely different creative approach, not a variation on a single idea. For each concept, define: Title (working title), Hook (first 2 seconds description — what grabs attention), Narrative arc (beginning, middle, end summary), Visual style (cinematic style from the data, color palette, lighting direction), Music mood (genre, tempo, energy level from music-mood-mapping), Target format (primary format recommendation: brand-film, explainer, social-short, product-demo), Estimated duration (based on narrative complexity), Estimated cost range (rough estimate based on scene count and tool usage), Pros (strengths of this approach), Cons (weaknesses or risks).</action>
+      <output>3-5 distinct video concepts with full detail</output>
+    </step>
+
+    <step id="4" name="present_concepts">
+      <action>Present all concepts to the user in a clear, comparable format. Highlight the tradeoffs between concepts: which is most creative vs most safe, which is cheapest vs highest quality, which works best for the target platform. If the user wants to combine elements from multiple concepts, facilitate that. Allow the user to select one concept, request modifications, or ask for entirely new concepts.</action>
+      <output>User-selected concept (or request for refinement)</output>
+    </step>
+
+    <step id="5" name="refine_and_output">
+      <action>Refine the selected concept based on user feedback. Expand the narrative arc into a brief outline (scene-level description). Confirm the visual style, music direction, and format choice. Output the finalized concept document that feeds into the idea-to-script workflow. Save the concept selection to the creative director sidecar memory for future reference.</action>
+      <output>Finalized concept document ready for idea-to-script</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>At least 3 distinct concepts generated (not variations of one idea)</gate>
+    <gate>Each concept has all required fields: title, hook, narrative arc, visual style, music mood, format, duration, cost range, pros, cons</gate>
+    <gate>Concepts are genuinely different creative approaches</gate>
+    <gate>Brand alignment considered (if brand config exists)</gate>
+    <gate>User selected or refined a concept</gate>
+    <gate>Finalized concept document output for downstream workflows</gate>
+  </quality-gates>
+</instructions>

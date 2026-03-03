@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "COOKIE Character Identity",
+  "description": "Schema for character identity files used by the COOKIE framework. Validated by the validate-character task (T7).",
+  "type": "object",
+  "required": ["character_id", "name", "type", "prompt_tokens"],
+  "properties": {
+    "character_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Unique identifier matching the character directory name"
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name of the character"
+    },
+    "role": {
+      "type": "string",
+      "description": "Character's role in the video (e.g., Hotel General Manager)"
+    },
+    "type": {
+      "enum": ["visual-voice", "visual-only", "voice-only"],
+      "description": "Whether the character has visual, voice, or both representations"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief character description for reference"
+    },
+
+    "physical": {
+      "type": "object",
+      "description": "Physical appearance details for visual characters",
+      "properties": {
+        "height": {
+          "type": "string",
+          "description": "Relative height (e.g., tall, average, short)"
+        },
+        "build": {
+          "type": "string",
+          "description": "Body build description"
+        },
+        "hair": {
+          "type": "string",
+          "description": "Hair color, style, length"
+        },
+        "eyes": {
+          "type": "string",
+          "description": "Eye color and characteristics"
+        },
+        "skin_tone": {
+          "type": "string",
+          "description": "Skin tone description"
+        },
+        "age_range": {
+          "type": "string",
+          "description": "Apparent age range (e.g., late 40s to mid 50s)"
+        },
+        "distinguishing_features": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Notable visual features (glasses, scars, tattoos, etc.)"
+        }
+      }
+    },
+
+    "prompt_tokens": {
+      "type": "object",
+      "required": ["core_identity"],
+      "description": "Text tokens injected into generation prompts",
+      "properties": {
+        "core_identity": {
+          "type": "string",
+          "description": "Always injected into prompts when this character appears. Must be a complete visual description."
+        },
+        "negative": {
+          "type": "string",
+          "description": "What the character should NOT look like. Added to negative prompts."
+        },
+        "veo_specific": {
+          "type": "string",
+          "description": "Additional tokens optimized for VEO video generation prompts"
+        },
+        "nano_banana_specific": {
+          "type": "string",
+          "description": "Additional tokens optimized for Nano Banana image generation prompts"
+        }
+      }
+    },
+
+    "voice": {
+      "type": "object",
+      "description": "ElevenLabs voice configuration. Required if type is visual-voice or voice-only.",
+      "properties": {
+        "elevenlabs_voice_id": {
+          "type": "string",
+          "description": "ElevenLabs voice ID"
+        },
+        "stability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Voice stability (0=variable, 1=consistent)"
+        },
+        "clarity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Voice clarity / similarity boost"
+        },
+        "style": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Style exaggeration"
+        },
+        "speaking_style": {
+          "type": "string",
+          "description": "Description of how the character speaks"
+        },
+        "language": {
+          "type": "string",
+          "description": "Primary language"
+        }
+      }
+    },
+
+    "active_style": {
+      "type": "string",
+      "description": "Currently active visual style (e.g., realistic, animated)"
+    },
+    "active_outfit": {
+      "type": "string",
+      "description": "Currently active outfit within the active style"
+    },
+    "available_styles": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of available visual styles"
+    },
+    "available_outfits": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      },
+      "description": "Map of style name to list of available outfits"
+    }
+  },
+  "if": {
+    "properties": {
+      "type": { "enum": ["visual-voice", "voice-only"] }
+    }
+  },
+  "then": {
+    "required": ["voice"],
+    "properties": {
+      "voice": {
+        "required": ["elevenlabs_voice_id"]
+      }
+    }
+  }
+}

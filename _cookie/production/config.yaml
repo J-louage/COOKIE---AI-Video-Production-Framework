@@ -1,0 +1,15 @@
+# COOKIE Production Module Configuration
+module_name: "production"
+inherits: "_config/global.yaml"
+agents:
+  - "screenwriter"
+  - "storyboard-artist"
+  - "character-designer"
+  - "prompt-engineer"
+  - "cinematographer"
+  - "voice-director"
+  - "demo-producer"
+  - "sound-designer"
+workflows_path: "workflows/"
+templates_path: "templates/"
+checklists_path: "checklists/"

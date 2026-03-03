@@ -1,0 +1,18 @@
+# COOKIE Cost Tracking Configuration
+module_name: "cost-tracking"
+inherits: "_cookie/_config/global.yaml"
+estimates_path: "estimates/"
+actuals_path: "actuals/"
+reports_path: "reports/"
+pricing_source: "../_config/pricing.yaml"
+
+# Budget thresholds
+thresholds:
+  warning_percent: 80        # Warn when spent >= 80% of estimate
+  halt_percent: 120           # Halt when spent >= 120% of estimate
+  per_scene_warn: 5.00        # Warn when single scene exceeds $5
+  per_scene_halt: 10.00       # Halt when single scene exceeds $10
+
+# Retake settings
+retake_budget_percent: 20     # Default retake buffer percentage
+max_retakes_per_scene: 3      # Max retakes before requiring explicit approval

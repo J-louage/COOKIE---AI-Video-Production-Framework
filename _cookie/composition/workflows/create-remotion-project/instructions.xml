@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>create-remotion-project</workflow>
+    <description>Scaffold and configure a new Remotion project from an episode format template</description>
+    <agent>motion-designer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="determine_template">
+      <action>Read the episode format from the SSD or episode configuration. Map the format to the appropriate Remotion project template. Available templates may include: standard (16:9 landscape), short-form (9:16 vertical), square (1:1), or custom. If no matching template exists, use the standard template as a base and adjust dimensions. Log the selected template and reasoning.</action>
+      <output>Selected Remotion project template name</output>
+    </step>
+
+    <step id="2" name="scaffold_from_template">
+      <action>Scaffold a new Remotion project from the selected template into episodes/{episode_id}/remotion/. Copy the template structure including: src/ directory with Root component, package.json with Remotion dependencies, tsconfig.json, and any template-specific components. Ensure the project directory structure follows Remotion conventions. Do not overwrite any existing files if the directory already contains content.</action>
+      <output>Scaffolded Remotion project directory</output>
+    </step>
+
+    <step id="3" name="configure_remotion_config">
+      <action>Configure remotion.config.ts with episode-specific settings. Set the composition width and height based on the target resolution from the SSD. Set the FPS (frames per second) to match the project specification (typically 30). Set the default codec and encoding settings. Configure the webpack override if custom asset loading is needed. Set the output location for renders.</action>
+      <output>Configured remotion.config.ts</output>
+    </step>
+
+    <step id="4" name="set_up_asset_references">
+      <action>Configure the project to reference episode assets. Set up the public/ directory or staticFile paths to point to the episode asset directories (video clips, audio files, images). Create type-safe asset path helpers if using TypeScript. Verify that asset paths resolve correctly from within the Remotion project. Document the asset directory mapping for other workflows.</action>
+      <output>Asset references configured and verified</output>
+    </step>
+
+    <step id="5" name="install_dependencies">
+      <action>Run npm install in the project directory to install all dependencies. Verify Remotion core packages are installed at compatible versions (@remotion/cli, @remotion/player, remotion). Install any additional packages required by the template (e.g., @remotion/media-utils for audio visualization). Resolve any dependency conflicts. Verify package-lock.json is generated.</action>
+      <output>All dependencies installed successfully</output>
+    </step>
+
+    <step id="6" name="verify_preview_starts">
+      <action>Start the Remotion preview server using npx remotion preview. Verify the development server starts without errors. Confirm the composition is listed and selectable in the Remotion Studio. Verify video and audio assets load correctly in the preview. Check that the timeline displays the correct duration. Stop the preview server after verification. Log any warnings encountered during startup.</action>
+      <output>Preview verification report confirming project is ready</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Episode format mapped to correct Remotion template</gate>
+    <gate>Project scaffolded with complete directory structure</gate>
+    <gate>remotion.config.ts configured with correct resolution, FPS, and codec</gate>
+    <gate>Asset references resolve correctly from within the project</gate>
+    <gate>All dependencies installed without conflicts</gate>
+    <gate>Remotion preview server starts without errors</gate>
+    <gate>Composition listed and playable in Remotion Studio</gate>
+  </quality-gates>
+</instructions>

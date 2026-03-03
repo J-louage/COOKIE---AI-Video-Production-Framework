@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>composition-preview</workflow>
+    <description>Render a low-resolution preview of the composition for review and approval</description>
+    <agent>motion-designer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="set_low_res_render_config">
+      <action>Configure the Remotion render settings for a low-resolution preview. Set resolution to 720p (1280x720) regardless of the final target resolution. Set CRF to 28 for smaller file size. Set codec to h264 with fast encoding preset. Disable any computationally expensive effects that are not critical for review. Set concurrency based on available CPU cores (default to 50% of available cores).</action>
+      <output>Low-resolution render configuration applied</output>
+    </step>
+
+    <step id="2" name="render_via_remotion_cli">
+      <action>Execute the Remotion render command: npx remotion render {composition-id} {output-path} with the low-res configuration. Monitor render progress and log any warnings or errors. Handle render failures by checking for common issues (missing assets, memory errors, codec problems) and retrying once after fixing. Save the rendered preview to episodes/{episode_id}/exports/preview/preview-{timestamp}.mp4.</action>
+      <output>Rendered preview video file</output>
+    </step>
+
+    <step id="3" name="calculate_render_time">
+      <action>Calculate and report the render duration. Log wall-clock time for the render and estimate time for the full-resolution final render based on the ratio.</action>
+      <output>Render duration report with full-resolution estimate</output>
+    </step>
+
+    <step id="4" name="present_preview">
+      <action>Present the rendered preview to the user for review. Display the preview file path, duration, resolution, and file size. Provide a summary of what is included in the composition: number of scenes, transitions used, audio tracks, and text overlays. Note any known issues or placeholder elements that will be finalized in the full render.</action>
+      <output>Preview presentation with composition summary</output>
+    </step>
+
+    <step id="5" name="approval_gate">
+      <action>Request explicit approval or rejection of the preview. If approved, mark the composition as ready for final render and update the workflow status. If not approved, collect specific feedback on what needs to change (timing, transitions, audio levels, text placement, visual issues). Document all feedback items as actionable revision tasks. Do not proceed to post-production until approval is obtained.</action>
+      <output>Approval decision with feedback (if rejected)</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Render configuration set to 720p with fast encoding preset</gate>
+    <gate>Preview renders successfully without errors</gate>
+    <gate>Preview file saved to exports/preview/ with timestamp</gate>
+    <gate>Preview presented with composition summary</gate>
+    <gate>Explicit approval or rejection obtained from reviewer</gate>
+    <gate>Rejection feedback documented as actionable revision tasks</gate>
+  </quality-gates>
+</instructions>

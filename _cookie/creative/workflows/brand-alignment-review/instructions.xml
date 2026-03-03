@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>brand-alignment-review</workflow>
+    <description>Review assets against brand guidelines using a structured scoring rubric</description>
+    <agent>creative-director</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_brand_context">
+      <action>Load all brand reference materials: brand-config.json from characters/brand/, the project style guide (if exists), brand colors, brand fonts, and any previous brand review scores from the creative director sidecar. Identify the type of asset being reviewed: script, SSD, video export, or moodboard.</action>
+      <output>Brand reference materials and asset type identified</output>
+    </step>
+
+    <step id="2" name="load_review_asset">
+      <action>Load the asset to be reviewed. For scripts: load the canonical script markdown. For SSDs: load the scene-spec.yaml. For video exports: reference the rendered video file path. For moodboards: load the moodboard document. Extract the key elements that will be scored against the brand rubric.</action>
+      <output>Review asset loaded with key elements extracted</output>
+    </step>
+
+    <step id="3" name="score_tone_and_voice">
+      <action>Score the Tone and Voice category (1-5 scale). Evaluate: Does the narration text match brand voice guidelines (formal, conversational, technical, warm)? Is the messaging consistent with brand positioning? Does the emotional tone align with brand identity? Does the language reflect the target audience? Provide specific line or scene references for any scores below 4.</action>
+      <output>Tone and Voice score (1-5) with specific feedback</output>
+    </step>
+
+    <step id="4" name="score_visual_identity">
+      <action>Score the Visual Identity category (1-5 scale). Evaluate: Are brand colors used correctly (primary, secondary, accent in right proportions)? Is typography consistent with brand fonts (heading font, body font, size hierarchy)? Does the logo appear correctly if applicable? Are visual elements consistent with the project style guide? Is the overall visual feel aligned with the brand mood? Reference specific scenes or elements for scores below 4.</action>
+      <output>Visual Identity score (1-5) with specific feedback</output>
+    </step>
+
+    <step id="5" name="score_messaging_and_content">
+      <action>Score the Messaging and Content category (1-5 scale). Evaluate: Does the content serve the brand's objectives (awareness, conversion, education, engagement)? Is the call-to-action clear and brand-appropriate? Does the hook engage the target audience effectively? Is the content narrative coherent and purposeful? Are there any messaging elements that contradict the brand? Reference specific scenes for scores below 4.</action>
+      <output>Messaging and Content score (1-5) with specific feedback</output>
+    </step>
+
+    <step id="6" name="score_audience_alignment">
+      <action>Score the Audience Alignment category (1-5 scale). Evaluate: Is the content appropriate for the target demographic? Does the pacing match audience expectations for the target platform (fast for TikTok, moderate for YouTube, professional for LinkedIn)? Are accessibility standards met (captions present, sufficient color contrast, readable text sizes)? Does the content length match platform norms? Reference specific issues for scores below 4.</action>
+      <output>Audience Alignment score (1-5) with specific feedback</output>
+    </step>
+
+    <step id="7" name="calculate_overall_and_gate">
+      <action>Calculate the overall brand alignment score as the average of all four category scores. Determine approval status: Score >= 4.0 — Approved (green light for production or delivery), Score 3.0-3.9 — Conditionally approved (specific changes required before proceeding), Score below 3.0 — Needs rework (significant revisions required, return to relevant workflow). Flag any individual category scoring below 3.0 as a critical issue regardless of overall score.</action>
+      <output>Overall score, approval status, and critical flags</output>
+    </step>
+
+    <step id="8" name="generate_recommendations">
+      <action>Generate specific, actionable recommendations for improvement. For each category that scored below 5: describe what needs to change and how. Prioritize recommendations by impact (highest impact changes first). If conditionally approved: list the minimum changes required for full approval. If needs rework: identify the workflow that needs to be re-run (e.g., re-run script review, update style guide, regenerate assets). Save the review scores and recommendations to the creative director sidecar for tracking patterns over time.</action>
+      <output>Prioritized recommendations and review saved to sidecar</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Brand reference materials loaded (brand config, style guide, fonts, colors)</gate>
+    <gate>All four categories scored on 1-5 scale with specific feedback</gate>
+    <gate>Overall score calculated as average of four categories</gate>
+    <gate>Approval gate applied (>= 4.0 approved, 3.0-3.9 conditional, below 3.0 rework)</gate>
+    <gate>Specific recommendations provided for every category below 5</gate>
+    <gate>Critical flags raised for any category below 3.0</gate>
+    <gate>Review scores saved to creative director sidecar</gate>
+  </quality-gates>
+</instructions>

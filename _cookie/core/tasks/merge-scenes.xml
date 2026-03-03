@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Core Task: Merge Scenes (T8)
+  Invocation: <invoke-task>merge-scenes</invoke-task> or /cookie-merge-scenes
+
+  Input:  List of clip files + merge strategy
+  Output: Merged video file via FFmpeg
+
+  Merges multiple video clips into a single output. Supports ffmpeg-concat
+  (simple concat with -c copy) and crossfade (with transition filter).
+  Verifies matching resolution, frame rate, and codec before merge.
+-->
+<task id="T8" name="merge-scenes" version="1.0">
+  <metadata>
+    <description>Merge multiple video clip files into a single output using FFmpeg. Supports simple concatenation and crossfade transitions. Validates clip compatibility before merging.</description>
+    <priority>P1</priority>
+    <phase>post-production</phase>
+  </metadata>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- INPUTS                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <inputs>
+    <input name="clip_list" required="true">
+      <description>Ordered list of clip file paths to merge.</description>
+    </input>
+    <input name="merge_strategy" required="true">
+      <description>
+        Merge strategy. One of:
+        - "ffmpeg-concat": Simple concatenation using FFmpeg concat demuxer with -c copy (no re-encoding). Fastest. Requires identical codecs/resolution/framerate.
+        - "crossfade": Concatenation with crossfade transitions using xfade filter. Requires re-encoding.
+      </description>
+    </input>
+    <input name="crossfade_duration" required="false">
+      <default>0.5</default>
+      <description>Duration of crossfade in seconds. Only used with "crossfade" strategy.</description>
+    </input>
+    <input name="output_path" required="true">
+      <description>Output file path for the merged video.</description>
+    </input>
+  </inputs>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output>
+    <path>{output_path}</path>
+    <description>Merged video file containing all input clips in order.</description>
+  </output>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1: VALIDATE CLIP EXISTENCE                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="1" name="Validate Clip Existence">
+    <description>Verify all input clip files exist and are readable.</description>
+    <actions>
+      <action>
+        For each clip in clip_list:
+        - Verify file exists at the specified path
+        - Verify file is readable and non-zero size
+        - Verify file has a valid video extension (.mp4, .mov, .webm)
+        If any clip is missing: HALT with list of missing files.
+        If fewer than 2 clips: HALT "At least 2 clips required for merging."
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2: PROBE CLIP METADATA                                       -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="2" name="Probe Clip Metadata">
+    <description>Extract technical metadata from each clip using ffprobe.</description>
+    <actions>
+      <action>
+        For each clip, run:
+          ffprobe -v quiet -print_format json -show_streams -show_format "{clip_path}"
+
+        Extract:
+        - resolution: width x height
+        - frame_rate: r_frame_rate (e.g., "24/1")
+        - codec: codec_name (e.g., "h264", "vp9")
+        - pixel_format: pix_fmt (e.g., "yuv420p")
+        - duration: in seconds
+        - audio_codec: if audio stream present
+        - audio_sample_rate: if audio stream present
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3: VERIFY CLIP COMPATIBILITY                                  -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="3" name="Verify Compatibility">
+    <description>Ensure all clips have matching resolution, frame rate, and codec.</description>
+    <actions>
+      <action>
+        Use the first clip as reference. Compare all subsequent clips:
+
+        CHECK: Resolution matches (width x height)
+        - If mismatch with ffmpeg-concat strategy: HALT "Resolution mismatch. Use crossfade strategy or re-render."
+        - If mismatch with crossfade strategy: WARN, use first clip's resolution as target.
+
+        CHECK: Frame rate matches
+        - If mismatch: HALT "Frame rate mismatch."
+
+        CHECK: Codec matches
+        - If mismatch with ffmpeg-concat: HALT "Codec mismatch. Use crossfade strategy for re-encoding."
+        - If mismatch with crossfade: WARN, will re-encode to common codec.
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4: EXECUTE FFMPEG-CONCAT MERGE                               -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="4" name="FFmpeg Concat" condition="merge_strategy == 'ffmpeg-concat'">
+    <description>Generate concat demuxer file and execute simple concatenation.</description>
+    <actions>
+      <action>
+        Create temporary concat list file with content:
+          file '{absolute_path_to_clip_1}'
+          file '{absolute_path_to_clip_2}'
+          ...
+      </action>
+      <action>
+        Execute FFmpeg:
+          ffmpeg -y -f concat -safe 0 -i "{concat_list_path}" -c copy "{output_path}"
+
+        This performs stream copy (no re-encoding) -- fastest possible merge.
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5: EXECUTE CROSSFADE MERGE                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="5" name="Crossfade Merge" condition="merge_strategy == 'crossfade'">
+    <description>Execute merge with crossfade transitions using xfade filter.</description>
+    <actions>
+      <action>
+        Build FFmpeg filter_complex chain:
+        - For N clips, create N-1 xfade filter stages
+        - Calculate offset for each transition:
+            offset_i = sum(durations[0..i]) - (crossfade_duration * i)
+        - Apply same logic for audio using acrossfade filter
+      </action>
+      <action>
+        Execute FFmpeg (example for 3 clips):
+          ffmpeg -y \
+            -i "{clip1}" -i "{clip2}" -i "{clip3}" \
+            -filter_complex "
+              [0:v][1:v]xfade=transition=fade:duration={xf_dur}:offset={offset1}[v01];
+              [v01][2:v]xfade=transition=fade:duration={xf_dur}:offset={offset2}[vout];
+              [0:a][1:a]acrossfade=d={xf_dur}[a01];
+              [a01][2:a]acrossfade=d={xf_dur}[aout]
+            " \
+            -map "[vout]" -map "[aout]" \
+            -c:v libx264 -preset medium -crf 18 \
+            -c:a aac -b:a 192k \
+            "{output_path}"
+
+        Output duration = sum of inputs - (crossfade_duration * (clip_count - 1))
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 6: VERIFY OUTPUT                                              -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="6" name="Verify Output">
+    <description>Verify the merged output file is valid and duration is correct.</description>
+    <actions>
+      <action>
+        Check output file exists and has non-zero size.
+        Run ffprobe on output to verify:
+        - Valid video container
+        - Resolution matches input clips
+        - Video and audio streams present
+      </action>
+      <action>
+        Calculate expected duration:
+        - ffmpeg-concat: sum of all clip durations
+        - crossfade: sum of durations - ((num_clips - 1) * crossfade_duration)
+        Verify actual duration is within 1 second of expected.
+        If mismatch > 1s: WARN
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 7: CLEANUP AND REPORT                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="7" name="Cleanup and Report">
+    <description>Remove temporary files and report the merge result.</description>
+    <actions>
+      <action>Remove temporary concat list file (if created)</action>
+      <action>Keep all source clips (never delete originals)</action>
+      <action>
+        Report result:
+        - output_path, file_size, duration, clip_count, strategy, resolution, codec
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ERROR HANDLING                                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <error_handling>
+    <error condition="Clip file not found">
+      <action>HALT: "Clip not found: {path}. All missing: {list}"</action>
+    </error>
+    <error condition="FFmpeg not installed">
+      <action>HALT: "FFmpeg is required but not found in PATH."</action>
+    </error>
+    <error condition="Resolution mismatch (ffmpeg-concat)">
+      <action>HALT: "Resolution mismatch. Clip '{clip}' is {res} but expected {expected}. Use crossfade strategy or re-render."</action>
+    </error>
+    <error condition="Codec mismatch (ffmpeg-concat)">
+      <action>HALT: "Codec mismatch. Clip '{clip}' uses {codec} but expected {expected}. Use crossfade strategy."</action>
+    </error>
+    <error condition="Frame rate mismatch">
+      <action>HALT: "Frame rate mismatch. Clip '{clip}' is {fps}fps but expected {expected}fps."</action>
+    </error>
+    <error condition="FFmpeg execution failure">
+      <action>HALT: "FFmpeg merge failed with exit code {code}. stderr: {output}"</action>
+    </error>
+    <error condition="Output file zero size">
+      <action>HALT: "Merge produced empty output file."</action>
+    </error>
+    <error condition="Fewer than 2 clips">
+      <action>HALT: "At least 2 clips required for merging. Received {count}."</action>
+    </error>
+  </error_handling>
+
+</task>

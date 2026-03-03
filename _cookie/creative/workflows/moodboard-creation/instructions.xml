@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>moodboard-creation</workflow>
+    <description>Create visual moodboard with color palette, typography, reference imagery, and style direction</description>
+    <agent>creative-director</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_context">
+      <action>Load the selected concept or script for the episode. Load the brand config from characters/brand/brand-config.json if it exists. Load any existing style guide for the project. Load the color palettes data and cinematic styles data from creative/data/ for reference.</action>
+      <output>Concept, brand context, and reference data loaded</output>
+    </step>
+
+    <step id="2" name="define_color_palette">
+      <action>Define the color palette for the episode using the color-theory skill. Select 5-7 colors with hex codes and usage notes: primary color (dominant brand/mood color), secondary color (supporting color), accent color (highlights, CTAs, emphasis), background color (base for compositions), text color (primary text), and 1-2 additional colors for variety. Annotate each color with its purpose and emotional association. Verify palette works for accessibility (contrast ratios for text).</action>
+      <output>Color palette with 5-7 colors, hex codes, usage notes, and accessibility check</output>
+    </step>
+
+    <step id="3" name="select_typography">
+      <action>Select a font pair for the episode: a display/heading font (for titles, lower thirds, emphasis) and a body/caption font (for subtitles, descriptions, fine print). Define the size hierarchy: title size, subtitle size, body size, caption size. Verify the fonts are available in Remotion (Google Fonts or bundled). Ensure the typography pair aligns with the brand voice (e.g., serif for luxury, sans-serif for tech, rounded for friendly).</action>
+      <output>Font pair selected with size hierarchy and brand alignment notes</output>
+    </step>
+
+    <step id="4" name="generate_reference_images">
+      <action>Generate 5-8 reference images via Nano Banana to establish the visual direction. Generate: 2 establishing/environment shots (showing the world and setting), 2 character mood/pose references (showing character energy and style), 2 detail/texture references (showing material quality and close-up aesthetics), 1-2 title card/text overlay style references (showing how text sits in the visual). Each image should be generated at 1K resolution to minimize cost. Annotate each image with its purpose in the moodboard.</action>
+      <output>5-8 annotated reference images establishing visual direction</output>
+    </step>
+
+    <step id="5" name="cost_gate">
+      <action>Calculate the cost for moodboard image generation. Typically 5-8 images at 1K resolution via Nano Banana. Present the cost to the user (expected range: $0.15-$0.25 at gemini-3.1-flash-image-preview rates). In YOLO mode, auto-approve. In normal mode, get user approval before generating.</action>
+      <output>Cost approved for reference image generation</output>
+    </step>
+
+    <step id="6" name="define_style_direction">
+      <action>Complete the moodboard with additional style elements: Lighting direction (key light position, color temperature, ambient quality, shadow style), Camera style (movement preferences: smooth gimbal, handheld, static; lens choices: wide, medium, close-up; depth of field), Music/audio direction (genre, instruments, tempo in BPM, energy level, mood keywords), Transition style (preferred transitions between scenes from the transition library data).</action>
+      <output>Complete style direction covering lighting, camera, music, and transitions</output>
+    </step>
+
+    <step id="7" name="compile_and_present">
+      <action>Compile all moodboard components into a structured document. Present the complete moodboard to the user for review and approval. The moodboard document includes: color palette, typography pair, reference images with annotations, lighting direction, camera style, music/audio direction, and transition preferences. Allow the user to request changes to any component.</action>
+      <output>Complete moodboard presented for user approval</output>
+    </step>
+
+    <step id="8" name="finalize_and_output">
+      <action>Incorporate user feedback and finalize the moodboard. Save the approved moodboard to the episode directory. Output the moodboard document for the create-style-guide workflow. Save moodboard decisions to the creative director sidecar memory.</action>
+      <output>Approved moodboard saved and ready for style guide creation</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Color palette has 5-7 colors with hex codes and usage notes</gate>
+    <gate>Typography pair selected with size hierarchy</gate>
+    <gate>5-8 reference images generated with purpose annotations</gate>
+    <gate>Lighting, camera, music, and transition direction defined</gate>
+    <gate>Moodboard cost approved before image generation</gate>
+    <gate>Complete moodboard reviewed and approved by user</gate>
+    <gate>Moodboard document saved for downstream workflows</gate>
+  </quality-gates>
+</instructions>

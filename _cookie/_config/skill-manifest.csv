@@ -1,0 +1,9 @@
+skill_id,name,path,used_by,description
+veo,VEO,skills/veo/,"cinematographer,prompt-engineer,storyboard-artist",VEO video generation — text-to-video and image-to-video and interpolation
+nano-banana,Nano Banana,skills/nano-banana/,"character-designer,storyboard-artist,cinematographer,prompt-engineer",Nano Banana Pro image generation
+elevenlabs,ElevenLabs,skills/elevenlabs/,voice-director,ElevenLabs voice generation — narration and dialogue
+remotion,Remotion,skills/remotion/,"motion-designer,editor",Remotion video composition — animations and text and audio
+ffmpeg,FFmpeg,skills/ffmpeg/,"editor,sound-designer",FFmpeg encoding — scene merging and format export and audio mixing
+playwright,Playwright,skills/playwright/,demo-producer,Playwright screen recording — viewport management and user actions
+image-editing,Image Editing,skills/image-editing/,"character-designer,storyboard-artist,cinematographer,editor",Image manipulation — transforms and effects and batch processing
+shared,Shared Skills,skills/shared/,All agents,Cross-cutting knowledge — prompt engineering and color theory and typography

@@ -1,0 +1,862 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Framework — Error Recovery
+  Centralized error handling definitions for the workflow engine.
+
+  This file defines handlers for all known error types that can occur
+  during workflow execution. Each handler specifies the recovery strategy,
+  retry logic, user interaction requirements, and escalation paths.
+  All protocols reference this file for their error handling behavior.
+-->
+<error_recovery version="1.0">
+
+  <metadata>
+    <name>Error Recovery</name>
+    <description>
+      Centralized error recovery definitions for the COOKIE workflow engine.
+      Defines six error types with specific recovery strategies ranging from
+      interactive user prompts to automated retries with exponential backoff.
+      Every protocol in the engine delegates its error handling to the
+      appropriate handler defined here.
+    </description>
+    <referenced_by>
+      <protocol>discover-inputs.xml</protocol>
+      <protocol>preflight-check.xml</protocol>
+      <protocol>handoff.xml</protocol>
+      <protocol>dependency-resolve.xml</protocol>
+      <protocol>cost-gate.xml</protocol>
+    </referenced_by>
+  </metadata>
+
+  <!-- ================================================================
+       SECTION 1: GENERAL ERROR HANDLING RULES
+       ================================================================ -->
+  <general_rules>
+    <description>
+      Rules that apply to all error handlers unless overridden by
+      the specific handler definition.
+    </description>
+
+    <rule name="logging">
+      All errors are logged to the workflow execution log with:
+      - ISO 8601 timestamp
+      - Error type
+      - Error message
+      - Step ID where the error occurred
+      - Workflow ID
+      - Full stack trace or context (if available)
+    </rule>
+
+    <rule name="context_preservation">
+      When an error occurs, the full workflow context at the time of
+      the error is preserved. This enables post-mortem analysis and
+      allows recovery handlers to make informed decisions.
+    </rule>
+
+    <rule name="handoff_recording">
+      All errors are recorded in the handoff document (handoff.xml)
+      regardless of whether they were recovered. The `recovery_attempted`
+      and `recovery_result` fields track what happened.
+    </rule>
+
+    <rule name="user_notification">
+      For errors that halt the workflow, the user is always notified
+      with a clear, actionable error message. Technical details are
+      available but not the primary display.
+    </rule>
+
+    <rule name="cascading_prevention">
+      If a single workflow step produces multiple errors of the same
+      type, they are grouped and presented together rather than
+      triggering the handler multiple times. This prevents cascading
+      error prompts from overwhelming the user.
+    </rule>
+  </general_rules>
+
+  <!-- ================================================================
+       ERROR TYPE 1: MISSING FILE
+       ================================================================ -->
+  <handler id="missing_file">
+    <name>Missing File</name>
+    <severity>critical</severity>
+    <description>
+      Triggered when a file path that was expected to exist on disk
+      cannot be found. This commonly occurs when asset paths are
+      misconfigured, files have been moved or deleted, or a prerequisite
+      workflow step was skipped.
+    </description>
+
+    <common_causes>
+      <cause>Incorrect path in workflow configuration or SSD.</cause>
+      <cause>File was moved, renamed, or deleted after workflow was planned.</cause>
+      <cause>Prerequisite workflow did not run (e.g., character refs not generated).</cause>
+      <cause>Typo in the `ref:` path or variable value.</cause>
+      <cause>Project structure does not match expected layout.</cause>
+    </common_causes>
+
+    <recovery_strategy>interactive</recovery_strategy>
+    <auto_retry>false</auto_retry>
+    <halts_workflow>true (unless input is marked optional)</halts_workflow>
+
+    <procedure>
+      <step order="1">
+        <name>Log the Error</name>
+        <action>
+          Record the missing file error with full context:
+          - The resolved absolute path that was not found.
+          - The original path expression before resolution (e.g., `ref:characters/marcus/identity.json`).
+          - The workflow step and input declaration that referenced it.
+          - The loading strategy that was attempted.
+        </action>
+      </step>
+
+      <step order="2">
+        <name>Check Optional Flag</name>
+        <action>
+          If the input declaration has `optional: true`:
+          - Log an INFO-level message about the missing optional file.
+          - Set the input value to null in the workflow context.
+          - Continue execution without prompting the user.
+          - Record in the handoff as a non-blocking warning.
+          - EXIT this handler (skip remaining steps).
+        </action>
+      </step>
+
+      <step order="3">
+        <name>Search for Similar Files</name>
+        <action>
+          Perform a fuzzy search in the expected directory and parent
+          directories for files with similar names. This helps catch
+          typos and minor path variations.
+          Present any candidates found to the user as suggestions.
+        </action>
+      </step>
+
+      <step order="4">
+        <name>Prompt User for Resolution</name>
+        <action>
+          Display the error to the user with the following information
+          and options:
+
+          <display>
+            ERROR: File not found
+            Path: {resolved_path}
+            Referenced by: step "{step_id}", input "{input_name}"
+            Original reference: {original_path_expression}
+
+            Similar files found:
+              1. {similar_file_1}
+              2. {similar_file_2}
+
+            Options:
+              [path]  — Enter the correct file path
+              [skip]  — Skip this input (step may fail or produce incomplete results)
+              [halt]  — Stop the workflow entirely
+              [run]   — Run the prerequisite workflow to generate this file
+          </display>
+        </action>
+      </step>
+
+      <step order="5">
+        <name>Process User Response</name>
+        <action>
+          Based on the user's choice:
+
+          <option name="path">
+            Accept the new path from the user.
+            Re-run path resolution and file existence validation.
+            If the new path is valid, update the workflow context and resume.
+            If the new path is also missing, return to step 4.
+          </option>
+
+          <option name="skip">
+            Mark the input as skipped in the workflow context.
+            Log a WARNING that the input was user-skipped.
+            Resume workflow execution. The step must handle the missing
+            input gracefully (or it will fail with a different error).
+          </option>
+
+          <option name="halt">
+            Halt the workflow immediately.
+            Produce a handoff document with status "failed" and this
+            error recorded.
+          </option>
+
+          <option name="run">
+            Identify the prerequisite workflow that would produce
+            the missing file. Present it to the user for confirmation.
+            If confirmed, queue the prerequisite workflow and suspend
+            the current workflow. Resume after the prerequisite completes.
+          </option>
+        </action>
+      </step>
+    </procedure>
+  </handler>
+
+  <!-- ================================================================
+       ERROR TYPE 2: UNRESOLVED VARIABLE
+       ================================================================ -->
+  <handler id="unresolved_variable">
+    <name>Unresolved Variable</name>
+    <severity>critical</severity>
+    <description>
+      Triggered when a `{variable}` placeholder in a workflow step
+      cannot be resolved from any source in the resolution chain.
+      This is always a critical error because it means the workflow
+      configuration is incomplete or incorrect. There is no safe
+      way to proceed with an unresolved variable — guessing would
+      be dangerous (e.g., writing to the wrong path, using the wrong
+      character, processing the wrong scene).
+    </description>
+
+    <common_causes>
+      <cause>Variable was never defined in any config layer.</cause>
+      <cause>Typo in the variable name.</cause>
+      <cause>Previous step that should have set the variable failed or was skipped.</cause>
+      <cause>Config inheritance chain is broken (missing config file).</cause>
+      <cause>Variable is defined in episode config but no episode is selected.</cause>
+    </common_causes>
+
+    <recovery_strategy>halt</recovery_strategy>
+    <auto_retry>false</auto_retry>
+    <halts_workflow>true (always)</halts_workflow>
+
+    <procedure>
+      <step order="1">
+        <name>Halt Immediately</name>
+        <action>
+          Stop all workflow execution immediately. Do not attempt to
+          continue with partial resolution. Do not substitute defaults
+          or empty strings for unresolved variables.
+        </action>
+      </step>
+
+      <step order="2">
+        <name>Compile Error Report</name>
+        <action>
+          Build a comprehensive error report containing:
+
+          <report>
+            CRITICAL ERROR: Unresolved Variable
+
+            Variable: {variable_name}
+            Found in: {location_in_step_definition}
+            Step: {step_id} ({step_name})
+            Workflow: {workflow_name}
+
+            Resolution chain checked:
+              1. Step locals          — not found
+              2. Workflow context      — not found
+              3. Workflow params       — not found
+              4. Episode config        — {status: not found / file missing}
+              5. Project config        — {status: not found / file missing}
+              6. Framework defaults    — not found
+
+            Possible fixes:
+              - Check spelling: did you mean {similar_variable_name}?
+              - Add "{variable_name}" to your episode config at:
+                {episode_path}/config.yaml
+              - Add "{variable_name}" to your project config at:
+                {project-root}/_cookie/_config/project.yaml
+              - Ensure the step that sets this variable ran successfully
+                before this step.
+          </report>
+        </action>
+      </step>
+
+      <step order="3">
+        <name>Display to User</name>
+        <action>
+          Present the full error report to the user. This error requires
+          manual intervention — the user must fix the configuration and
+          re-run the workflow. There is no automated recovery path for
+          unresolved variables.
+        </action>
+      </step>
+
+      <step order="4">
+        <name>Generate Handoff</name>
+        <action>
+          Produce a handoff document with:
+          - status: "failed"
+          - The unresolved variable error in the errors array.
+          - Any outputs from steps that completed before the failure.
+          - next_suggested: null (manual fix required).
+        </action>
+      </step>
+    </procedure>
+  </handler>
+
+  <!-- ================================================================
+       ERROR TYPE 3: VALIDATION FAILURE
+       ================================================================ -->
+  <handler id="validation_failure">
+    <name>Validation Failure</name>
+    <severity>critical</severity>
+    <description>
+      Triggered when data validation fails during preflight checks,
+      dependency graph parsing, config parsing, or output verification.
+      Examples include malformed YAML/JSON, schema violations, invalid
+      dependency graph structures (cycles), and type mismatches.
+    </description>
+
+    <common_causes>
+      <cause>Malformed YAML or JSON in config or SSD files.</cause>
+      <cause>Required fields missing from structured data.</cause>
+      <cause>Cycle detected in dependency graph.</cause>
+      <cause>Type mismatch (string where number expected, etc.).</cause>
+      <cause>Schema version incompatibility.</cause>
+      <cause>Corrupted file (partial write, encoding issues).</cause>
+    </common_causes>
+
+    <recovery_strategy>retry_then_halt</recovery_strategy>
+    <auto_retry>true</auto_retry>
+    <max_retries>1</max_retries>
+    <halts_workflow>true (after retry exhaustion)</halts_workflow>
+
+    <procedure>
+      <step order="1">
+        <name>Log the Validation Error</name>
+        <action>
+          Record the full validation error with:
+          - The file or data structure that failed validation.
+          - The specific validation rule that was violated.
+          - The expected format/value vs. the actual format/value.
+          - Line number and position (if applicable for parse errors).
+        </action>
+      </step>
+
+      <step order="2">
+        <name>Attempt Automatic Retry (Once)</name>
+        <action>
+          Retry the validation once. This handles transient issues such as:
+          - File was being written to by another process (partial read).
+          - Temporary filesystem inconsistency.
+          - Race condition with a concurrent workflow.
+
+          Before retrying:
+          - Wait 500ms to allow any in-progress writes to complete.
+          - Re-read the file from disk (do not use cached content).
+          - Re-run the validation from scratch.
+        </action>
+      </step>
+
+      <step order="3">
+        <name>Evaluate Retry Result</name>
+        <action>
+          If the retry succeeds:
+          - Log that the validation passed on retry.
+          - Record the transient failure in the handoff as a warning.
+          - Continue workflow execution normally.
+
+          If the retry fails:
+          - Proceed to step 4 (halt with details).
+        </action>
+      </step>
+
+      <step order="4">
+        <name>Halt with Detailed Report</name>
+        <action>
+          Halt the workflow and present a detailed validation failure report:
+
+          <report>
+            VALIDATION FAILURE — Retry Exhausted
+
+            Source: {file_path_or_data_source}
+            Validation Rule: {rule_name}
+            Attempt: 2 of 2 (initial + 1 retry)
+
+            Expected: {expected_description}
+            Actual: {actual_description}
+
+            Details:
+              {detailed_error_message}
+              {line_number_and_context_if_applicable}
+
+            Raw error:
+              {parser_error_message}
+
+            Suggestions:
+              - Validate the file manually: `cookie validate {file_path}`
+              - Check for encoding issues (expected UTF-8).
+              - Ensure the file was fully written (not truncated).
+              - Compare against the schema: {schema_reference}
+          </report>
+        </action>
+      </step>
+
+      <step order="5">
+        <name>Generate Handoff</name>
+        <action>
+          Produce a handoff document with status "failed" and the
+          validation failure details in the errors array.
+        </action>
+      </step>
+    </procedure>
+  </handler>
+
+  <!-- ================================================================
+       ERROR TYPE 4: API FAILURE
+       ================================================================ -->
+  <handler id="api_failure">
+    <name>API Failure</name>
+    <severity>critical</severity>
+    <description>
+      Triggered when an external API call fails. This covers all
+      tool integrations (OpenAI, Runway, ElevenLabs, Suno, etc.)
+      and includes network errors, authentication failures, rate
+      limits, server errors, and timeout issues.
+    </description>
+
+    <common_causes>
+      <cause>Network connectivity issues.</cause>
+      <cause>API rate limiting (429 Too Many Requests).</cause>
+      <cause>API server errors (500, 502, 503).</cause>
+      <cause>Authentication failure (expired API key, invalid credentials).</cause>
+      <cause>Request timeout.</cause>
+      <cause>API quota exceeded (monthly/daily limit reached).</cause>
+      <cause>Malformed API request (bug in request construction).</cause>
+      <cause>API service outage or maintenance.</cause>
+    </common_causes>
+
+    <recovery_strategy>exponential_backoff</recovery_strategy>
+    <auto_retry>true</auto_retry>
+    <max_retries>3</max_retries>
+    <halts_workflow>true (after retry exhaustion)</halts_workflow>
+
+    <retry_schedule>
+      <description>
+        Exponential backoff with three retry attempts. The wait times
+        increase exponentially to avoid overwhelming a struggling API
+        and to wait out transient issues like rate limits.
+      </description>
+      <attempt number="1">
+        <wait_seconds>1</wait_seconds>
+        <description>
+          First retry after 1 second. Handles brief transient errors
+          like momentary network glitches or load balancer hiccups.
+        </description>
+      </attempt>
+      <attempt number="2">
+        <wait_seconds>4</wait_seconds>
+        <description>
+          Second retry after 4 seconds. Handles rate limiting (most APIs
+          reset their rate limit window within a few seconds) and brief
+          server-side issues.
+        </description>
+      </attempt>
+      <attempt number="3">
+        <wait_seconds>16</wait_seconds>
+        <description>
+          Third and final retry after 16 seconds. Handles longer server-side
+          recovery periods. If this attempt fails, the error is considered
+          non-transient and requires user intervention.
+        </description>
+      </attempt>
+    </retry_schedule>
+
+    <procedure>
+      <step order="1">
+        <name>Classify the API Error</name>
+        <action>
+          Categorize the error to determine if it is retryable:
+
+          <classifications>
+            <class name="retryable" retry="true">
+              - HTTP 429 (Rate Limited)
+              - HTTP 500 (Internal Server Error)
+              - HTTP 502 (Bad Gateway)
+              - HTTP 503 (Service Unavailable)
+              - Connection timeout
+              - Network unreachable (transient)
+              - DNS resolution failure (transient)
+            </class>
+
+            <class name="non_retryable" retry="false">
+              - HTTP 400 (Bad Request) — request is malformed, retrying won't help.
+              - HTTP 401 (Unauthorized) — authentication issue, needs config fix.
+              - HTTP 403 (Forbidden) — permission issue, needs config fix.
+              - HTTP 404 (Not Found) — endpoint does not exist.
+              - HTTP 422 (Unprocessable Entity) — input validation error.
+              - API quota exhausted — needs billing or plan change.
+            </class>
+          </classifications>
+
+          For non-retryable errors, skip directly to step 4 (halt).
+        </action>
+      </step>
+
+      <step order="2">
+        <name>Execute Retry with Backoff</name>
+        <action>
+          For retryable errors, execute the retry schedule:
+
+          For each attempt (1 through 3):
+          - Wait the specified number of seconds.
+          - Log the retry attempt: "API retry {attempt}/3 for {tool} after {wait}s wait"
+          - Re-execute the API call with identical parameters.
+          - If successful: log recovery, record the transient failure as a
+            warning in the handoff, and continue execution.
+          - If failed: proceed to the next attempt.
+
+          Between retries, check if the error classification has changed
+          (e.g., a 429 might become a 401 if the key was revoked during
+          the wait). If the error becomes non-retryable, stop retrying.
+        </action>
+      </step>
+
+      <step order="3">
+        <name>All Retries Exhausted</name>
+        <action>
+          If all 3 retry attempts fail:
+          - Log that retry exhaustion occurred.
+          - Record the full API error history (all 4 attempts: initial + 3 retries)
+            with timestamps and error details.
+          - Proceed to step 4.
+        </action>
+      </step>
+
+      <step order="4">
+        <name>Halt with API Error Report</name>
+        <action>
+          Halt the workflow and present the API failure report:
+
+          <report>
+            API FAILURE — {retryable ? "Retries Exhausted" : "Non-Retryable Error"}
+
+            Tool: {tool_name}
+            API Endpoint: {endpoint_url}
+            Step: {step_id}
+
+            Error: {http_status_code} — {error_message}
+            Error Body: {api_error_response_body}
+
+            Attempt History:
+              1. {timestamp} — {status_code} {error_summary} (initial)
+              2. {timestamp} — {status_code} {error_summary} (retry after 1s)
+              3. {timestamp} — {status_code} {error_summary} (retry after 4s)
+              4. {timestamp} — {status_code} {error_summary} (retry after 16s)
+
+            Suggestions:
+              - For auth errors: check API key in _cookie/_config/credentials.yaml
+              - For rate limits: wait a few minutes and retry manually
+              - For quota errors: check your API plan and billing
+              - For server errors: check {tool_name} status page
+              - Run `cookie retry {workflow_id} --from-step {step_id}` to resume
+          </report>
+        </action>
+      </step>
+
+      <step order="5">
+        <name>Generate Handoff</name>
+        <action>
+          Produce a handoff document with status "failed" (or "partial"
+          if other steps completed). Include the full API error history
+          and all retry attempts in the errors array.
+          Set next_suggested to retry the failed step if the error was
+          transient, or to manual intervention if non-retryable.
+        </action>
+      </step>
+    </procedure>
+  </handler>
+
+  <!-- ================================================================
+       ERROR TYPE 5: COST EXCEEDED
+       ================================================================ -->
+  <handler id="cost_exceeded">
+    <name>Cost Exceeded</name>
+    <severity>critical</severity>
+    <description>
+      Triggered when a cost threshold is exceeded during cost-gate
+      evaluation or mid-workflow cost tracking. This handler ensures
+      that production costs stay within the creator's budget and that
+      any budget overruns are explicitly acknowledged.
+    </description>
+
+    <common_causes>
+      <cause>Single scene cost exceeds per_scene_halt threshold.</cause>
+      <cause>Cumulative session cost exceeds cumulative_halt threshold.</cause>
+      <cause>Actual costs during execution significantly exceed estimates.</cause>
+      <cause>Multiple retakes consumed the retake buffer and beyond.</cause>
+      <cause>Quality tier selection resulted in higher-than-expected costs.</cause>
+    </common_causes>
+
+    <recovery_strategy>interactive</recovery_strategy>
+    <auto_retry>false</auto_retry>
+    <halts_workflow>true (always)</halts_workflow>
+
+    <procedure>
+      <step order="1">
+        <name>Halt Immediately</name>
+        <action>
+          Stop all billable work immediately. No further API calls or
+          tool invocations that incur cost may proceed until this
+          handler completes with user approval.
+          Non-billable work (local file operations, logging) may continue.
+        </action>
+      </step>
+
+      <step order="2">
+        <name>Generate Cost Report</name>
+        <action>
+          Produce a comprehensive cost report showing:
+
+          <report>
+            COST THRESHOLD EXCEEDED
+
+            Threshold violated: {threshold_name}
+            Threshold value: ${threshold_value}
+            Actual/Estimated: ${actual_or_estimated_value}
+            Overage: ${overage_amount} ({overage_percent}%)
+
+            Current Session Cost Summary:
+              Approved budget:    ${per_episode_limit}
+              Spent so far:       ${cumulative_actual}
+              This workflow est.:  ${current_workflow_estimate}
+              Projected total:    ${projected_total}
+              Over budget by:     ${over_budget_amount}
+
+            Cost Breakdown (this workflow):
+              {per_scene_breakdown}
+              {per_tool_breakdown}
+
+            Budget Utilization:
+              [████████████████████░░░░] {utilization_percent}%
+
+            Options:
+              [increase]  — Increase budget to ${suggested_new_limit}
+              [lower]     — Switch to a lower quality tier
+              [modify]    — Modify the SSD to reduce scope
+              [skip]      — Skip remaining expensive scenes
+              [cancel]    — Cancel the workflow
+          </report>
+        </action>
+      </step>
+
+      <step order="3">
+        <name>Present to User and Await Decision</name>
+        <action>
+          Display the cost report and wait for the user's decision.
+          This is a blocking prompt — the workflow does not proceed
+          until the user responds.
+        </action>
+      </step>
+
+      <step order="4">
+        <name>Process User Decision</name>
+        <action>
+          Based on the user's choice:
+
+          <option name="increase">
+            Update the budget limit in the session context.
+            Re-run cost-gate threshold checks with the new limit.
+            If all thresholds now pass, resume workflow execution.
+            Log the budget increase for audit purposes.
+          </option>
+
+          <option name="lower">
+            Switch the quality tier for remaining work.
+            Re-calculate costs at the new tier.
+            Re-run cost-gate for approval at the new cost.
+          </option>
+
+          <option name="modify">
+            Suspend the workflow and return control to the user
+            for SSD modifications. Once modifications are saved,
+            re-run dependency-resolve and cost-gate from scratch.
+          </option>
+
+          <option name="skip">
+            Present a list of remaining scenes/tasks with their costs.
+            Let the user select which ones to skip.
+            Update the execution plan to exclude skipped tasks.
+            Re-calculate costs and re-check thresholds.
+          </option>
+
+          <option name="cancel">
+            Cancel the workflow entirely.
+            Produce a handoff with status "failed" and the cost
+            exceeded error. Include all outputs from steps that
+            completed before the halt.
+          </option>
+        </action>
+      </step>
+    </procedure>
+  </handler>
+
+  <!-- ================================================================
+       ERROR TYPE 6: ASSET QUALITY FAIL
+       ================================================================ -->
+  <handler id="asset_quality_fail">
+    <name>Asset Quality Failure</name>
+    <severity>warning</severity>
+    <description>
+      Triggered when a generated asset (image, video, audio) fails an
+      automated quality check but the issue is not severe enough to
+      halt the workflow. The asset is flagged for review at the next
+      quality gate checkpoint rather than stopping production immediately.
+      This allows the pipeline to continue generating other assets while
+      questionable ones are queued for human review.
+    </description>
+
+    <common_causes>
+      <cause>Generated image has low similarity to character reference sheet.</cause>
+      <cause>Video clip has visual artifacts or inconsistent motion.</cause>
+      <cause>Audio has clipping, distortion, or unexpected silence.</cause>
+      <cause>Character consistency check failed (face, clothing, etc.).</cause>
+      <cause>Scene composition does not match the SSD specification.</cause>
+      <cause>Resolution or aspect ratio does not match requirements.</cause>
+    </common_causes>
+
+    <recovery_strategy>flag_for_review</recovery_strategy>
+    <auto_retry>false</auto_retry>
+    <halts_workflow>false</halts_workflow>
+
+    <procedure>
+      <step order="1">
+        <name>Record Quality Failure</name>
+        <action>
+          Log the quality failure with full context:
+          - Asset ID and type (image, video, audio).
+          - The quality check that failed (e.g., character consistency,
+            resolution check, artifact detection).
+          - Quality score vs. threshold (if applicable).
+          - The generated asset's file path.
+          - The reference material used for comparison (if applicable).
+          - Screenshot or sample of the quality issue (if capturable).
+        </action>
+      </step>
+
+      <step order="2">
+        <name>Flag the Asset</name>
+        <action>
+          Add a quality flag to the asset in the workflow context:
+
+          <flag>
+            <asset_id>{asset_id}</asset_id>
+            <flag_type>quality_review_needed</flag_type>
+            <quality_check>{check_name}</quality_check>
+            <quality_score>{score}</quality_score>
+            <quality_threshold>{threshold}</quality_threshold>
+            <flagged_at>{timestamp}</flagged_at>
+            <step_id>{step_id}</step_id>
+            <asset_path>{file_path}</asset_path>
+            <severity>warning</severity>
+          </flag>
+
+          The flag is stored in:
+          `context.quality_flags[]`
+        </action>
+      </step>
+
+      <step order="3">
+        <name>Continue Workflow Execution</name>
+        <action>
+          DO NOT halt the workflow. The flagged asset is treated as
+          "provisionally accepted" and downstream steps may use it.
+          The flag is carried forward in the workflow context for
+          review at the next quality gate.
+
+          Rationale: Halting production for every minor quality issue
+          would make the pipeline extremely slow. Many quality issues
+          are subjective and better evaluated by the creator in batch
+          at a dedicated review checkpoint.
+        </action>
+      </step>
+
+      <step order="4">
+        <name>Quality Gate Review (at next checkpoint)</name>
+        <action>
+          When the workflow reaches a quality-gate step (a dedicated
+          review checkpoint defined in the workflow), all accumulated
+          quality flags are presented to the user:
+
+          <review_display>
+            QUALITY REVIEW — {count} assets flagged
+
+            ┌─────┬──────────────┬────────────────────┬───────┬──────────┐
+            │  #  │ Asset        │ Issue              │ Score │ Action   │
+            ├─────┼──────────────┼────────────────────┼───────┼──────────┤
+            │  1  │ scene-01.png │ Char. consistency  │ 0.62  │ [review] │
+            │  2  │ scene-03.mp4 │ Motion artifacts   │ 0.71  │ [review] │
+            │  3  │ narration.mp3│ Clipping detected  │ 0.85  │ [review] │
+            └─────┴──────────────┴────────────────────┴───────┴──────────┘
+
+            For each asset:
+              [accept]    — Accept as-is (quality is acceptable)
+              [retake]    — Re-generate the asset (costs will apply)
+              [manual]    — Replace with a manually provided asset
+              [skip]      — Remove this asset from the final output
+          </review_display>
+
+          Process user decisions for each flagged asset:
+          - Accept: clear the quality flag, keep the asset.
+          - Retake: queue re-generation, costs go through cost-gate.
+          - Manual: accept a user-provided file path as replacement.
+          - Skip: remove the asset and adjust the merge step.
+        </action>
+      </step>
+
+      <step order="5">
+        <name>Record in Handoff</name>
+        <action>
+          All quality flags and their review outcomes are recorded in
+          the handoff document. This provides a complete quality audit
+          trail for the production.
+
+          Assets that were retaken have their new versions tracked
+          alongside the original flagged versions for comparison.
+        </action>
+      </step>
+    </procedure>
+
+    <quality_gate_integration>
+      <description>
+        If no explicit quality-gate step exists in the workflow, flagged
+        assets are presented in a summary at the end of the workflow
+        (before the merge step, if one exists). The creator always gets
+        a chance to review flagged assets before they are included in
+        the final output.
+      </description>
+      <fallback_checkpoint>
+        The last non-merge step in the workflow serves as the implicit
+        quality gate if no explicit one is defined.
+      </fallback_checkpoint>
+    </quality_gate_integration>
+  </handler>
+
+  <!-- ================================================================
+       ERROR ESCALATION MATRIX
+       ================================================================ -->
+  <escalation_matrix>
+    <description>
+      Summary of all error types, their recovery behavior, and when
+      they escalate to a workflow halt. Used as a quick reference by
+      the workflow engine.
+    </description>
+
+    <matrix>
+      <!--
+        | Error Type          | Auto-Retry | Max Retries | Halts? | User Interaction |
+        |===|===|===|===|===|
+        | missing_file        | No         | 0           | Yes*   | Ask path or skip |
+        | unresolved_variable | No         | 0           | Always | Show error, halt |
+        | validation_failure  | Yes        | 1           | Yes**  | Show error, halt |
+        | api_failure         | Yes        | 3           | Yes*** | Show error, halt |
+        | cost_exceeded       | No         | 0           | Always | Show report, ask |
+        | asset_quality_fail  | No         | 0           | Never  | Review at gate   |
+
+        *  Unless input is marked optional.
+        ** After 1 retry fails.
+        *** After 3 retries fail.
+      -->
+      <entry error_type="missing_file"        auto_retry="false" max_retries="0" halts="conditional" interaction="ask_path_or_skip" />
+      <entry error_type="unresolved_variable"  auto_retry="false" max_retries="0" halts="always"      interaction="display_error" />
+      <entry error_type="validation_failure"   auto_retry="true"  max_retries="1" halts="after_retry"  interaction="display_error" />
+      <entry error_type="api_failure"          auto_retry="true"  max_retries="3" halts="after_retry"  interaction="display_error" />
+      <entry error_type="cost_exceeded"        auto_retry="false" max_retries="0" halts="always"      interaction="cost_report_and_decision" />
+      <entry error_type="asset_quality_fail"   auto_retry="false" max_retries="0" halts="never"       interaction="review_at_quality_gate" />
+    </matrix>
+  </escalation_matrix>
+
+</error_recovery>

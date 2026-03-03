@@ -1,0 +1,514 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Core Task: Validate Framework (T10)
+  Invocation: <invoke-task>validate-framework</invoke-task> or /cookie-validate-framework
+
+  Input:  Entire _cookie/ framework directory
+  Output: _cookie/validation/framework-validation-report.yaml
+
+  Comprehensive framework integrity scanner. Validates all workflow files,
+  file path references, slash commands, agent references, config inheritance,
+  pricing coverage, resolution profiles, help CSVs, and manifest completeness.
+
+  Expected manifest counts: agent-manifest.csv = 13 rows, task-manifest.csv = 10 rows, skill-manifest.csv = 8 rows.
+-->
+<task id="T10" name="validate-framework" version="1.0">
+  <metadata>
+    <description>Comprehensive validation of the entire COOKIE framework. Scans _cookie/ for structural integrity, reference consistency, configuration completeness, and manifest accuracy.</description>
+    <priority>P1</priority>
+    <phase>any</phase>
+  </metadata>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- INPUTS                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <inputs>
+    <input name="framework_root" required="true">
+      <path>_cookie/</path>
+      <description>Root directory of the COOKIE framework.</description>
+    </input>
+    <input name="commands_dir" required="true">
+      <path>.claude/commands/</path>
+      <description>Slash commands directory.</description>
+    </input>
+    <input name="config_dir" required="true">
+      <path>_config/</path>
+      <description>Global configuration directory (typically _cookie/_config/).</description>
+    </input>
+  </inputs>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output>
+    <path>_cookie/validation/framework-validation-report.yaml</path>
+    <description>Comprehensive validation report with total checks, passed, warnings, and failed counts.</description>
+  </output>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1: INITIALIZE                                                -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="1" name="Initialize">
+    <description>Set up the validation run and establish framework paths.</description>
+    <actions>
+      <action>Record start timestamp</action>
+      <action>Initialize counters: total_checks = 0, passed = 0, warnings = 0, failed = 0</action>
+      <action>Initialize results array grouped by category</action>
+      <action>
+        Establish framework paths:
+        - framework_root = _cookie/
+        - config_dir = _cookie/_config/
+        - core_dir = _cookie/core/
+        - production_dir = _cookie/production/
+        - composition_dir = _cookie/composition/
+        - creative_dir = _cookie/creative/
+        - skills_dir = _cookie/skills/
+        - manifests_dir = _cookie/_config/
+        - commands_dir = .claude/commands/
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2: VALIDATE WORKFLOW FILES                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="2" name="Workflow Integrity" category="workflows">
+    <description>Scan all workflow.yaml files for unresolved variables and valid references.</description>
+    <actions>
+      <action>
+        CHECK [WF-001]: No Unresolved {variables} in Workflows
+        Discover all workflow.yaml files under _cookie/ recursively.
+        For each workflow.yaml:
+        - Scan all string values for patterns matching \{[a-zA-Z_]+\}
+        - Exclude known runtime variables: {project-root}, {episode_id}, {episode_path}, {auto-detect}, {config_source}
+        - Flag remaining unresolved variables as FAIL
+        - If all variables resolve: PASS
+      </action>
+      <action>
+        CHECK [WF-002]: All File Paths in Workflows Reference Existing Files
+        For each workflow.yaml:
+        - Extract values that look like file paths (contain "/" and end in .xml, .md, .yaml, .csv, .json)
+        - Resolve each path relative to project root (substitute known variables)
+        - Exclude paths containing runtime variables like {episode_id}
+        - If resolved path does not exist: FAIL
+        - If exists: PASS
+      </action>
+      <action>
+        CHECK [WF-003]: All Agent References Match Agents in agents/ Directories
+        Collect all agent identifiers referenced in workflow.yaml files.
+        Scan _cookie/**/agents/ directories for agent definition files (.md).
+        For each referenced agent:
+        - If no matching agent definition file found: FAIL
+        - If found: PASS
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3: VALIDATE SLASH COMMANDS                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="3" name="Slash Command Integrity" category="commands">
+    <description>Check that all slash command files point to real files.</description>
+    <actions>
+      <action>
+        CHECK [CMD-001]: All Slash Commands in .claude/commands/ Point to Real Files
+        Scan all .claude/commands/**/*.md files.
+        For each command file:
+        - Read file content
+        - Extract any file path references (paths to _cookie/ files, workflow files, etc.)
+        - Verify each referenced file exists on the filesystem
+        - If reference points to non-existent file: FAIL
+        - If all references resolve: PASS
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4: VALIDATE CONFIG INHERITANCE                               -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="4" name="Config Inheritance" category="config">
+    <description>Verify config inheritance chain resolves correctly without cycles or missing parents.</description>
+    <actions>
+      <action>
+        CHECK [CFG-001]: Config Inheritance Chain Resolves Correctly
+        - Read _config/global.yaml as root config
+        - Scan for module-level config files that extend or override global
+        - Verify each "inherits" or "extends" reference resolves to an existing file
+        - Check for circular inheritance (A extends B extends A)
+        - If circular reference found: FAIL
+        - If any "inherits" target is missing: FAIL
+        - If chain resolves cleanly: PASS
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5: VALIDATE PRICING COVERAGE                                 -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="5" name="Pricing Coverage" category="pricing">
+    <description>Verify pricing.yaml has entries for all tools used in workflows.</description>
+    <actions>
+      <action>
+        CHECK [PRC-001]: pricing.yaml Has Entries for All Tools Used in Workflows
+        - Read _config/pricing.yaml
+        - Collect all tool identifiers from the pricing table
+        - Scan all workflow.yaml files for tool references
+        - For each tool referenced in workflows that is missing from pricing: FAIL
+        - If all tools have pricing entries: PASS
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 6: VALIDATE RESOLUTION PROFILES                              -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="6" name="Resolution Profiles" category="resolution">
+    <description>Verify resolution profiles are consistent with VEO model constraints.</description>
+    <actions>
+      <action>
+        CHECK [RES-001]: Resolution Profiles Consistent with VEO Model Constraints
+        - Read resolution-profiles.yaml
+        - For each profile, verify VEO resolution is valid for the default model
+        - VEO aspect ratios must be 16:9 or 9:16
+        - VEO durations must match model constraints (3.1: [4,6,8], 2.0: [5,6,7,8])
+        - If inconsistency found: WARN
+        - If consistent: PASS
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 7: VALIDATE HELP CSVs                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="7" name="Help CSV Coverage" category="help">
+    <description>Verify help CSVs have entries for all slash commands.</description>
+    <actions>
+      <action>
+        CHECK [HLP-001]: Help CSVs Have Entries for All Slash Commands
+        - Collect all slash command names from .claude/commands/ (cookie-*.md files)
+        - Read _config/cookie-help.csv
+        - Read all module-help.csv files
+        - For each slash command not found in any help CSV: WARN "Undocumented command"
+        - For each help CSV entry that has no matching command file: WARN "Phantom help entry"
+        - If all commands are documented: PASS
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 8: VALIDATE MANIFESTS                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="8" name="Manifest Integrity" category="manifests">
+    <description>Verify manifests are complete, accurate, and have the expected row counts.</description>
+    <actions>
+      <action>
+        CHECK [MAN-001]: agent-manifest.csv Has 13 Rows
+        - Read _cookie/_config/agent-manifest.csv
+        - Count data rows (excluding header)
+        - Expected: exactly 13 rows
+        - If count != 13: FAIL "agent-manifest.csv has {count} rows, expected 13"
+        - If count == 13: PASS
+        - For each row, verify the referenced agent definition file exists
+        - Check for duplicate agent_id values
+      </action>
+      <action>
+        CHECK [MAN-002]: task-manifest.csv Has 10 Rows
+        - Read _cookie/_config/task-manifest.csv
+        - Count data rows (excluding header)
+        - Expected: exactly 10 rows
+        - If count != 10: FAIL "task-manifest.csv has {count} rows, expected 10"
+        - If count == 10: PASS
+        - For each row, verify the referenced task file exists in _cookie/core/tasks/
+        - Check for duplicate task_id values
+      </action>
+      <action>
+        CHECK [MAN-003]: skill-manifest.csv Has 8 Rows
+        - Read _cookie/_config/skill-manifest.csv
+        - Count data rows (excluding header)
+        - Expected: exactly 8 rows
+        - If count != 8: FAIL "skill-manifest.csv has {count} rows, expected 8"
+        - If count == 8: PASS
+        - For each row, verify the referenced skill definition exists
+        - Check for duplicate skill_id values
+      </action>
+      <action>
+        CHECK [MAN-004]: Manifests Are Accurate (no phantoms, no missing)
+        - Compare agent-manifest.csv entries against actual agent files in _cookie/**/agents/
+        - Compare task-manifest.csv entries against actual task files in _cookie/core/tasks/
+        - Compare skill-manifest.csv entries against actual skill directories
+        - For entries in manifests that don't match real files: FAIL "Phantom entry"
+        - For real files not listed in manifests: FAIL "Missing from manifest"
+        - If all match: PASS
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 8.5: VALIDATE SCHEMAS                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="8.5" name="Schema Validation" category="schemas">
+    <description>Validate JSON/YAML schemas and instances for structural correctness.</description>
+    <actions>
+      <action>
+        CHECK [SCH-001]: character-schema.json Is Valid JSON Schema
+        - Locate _cookie/skills/*/character-schema.json or _cookie/**/character-schema.json
+        - Parse the file as JSON
+        - Verify it contains required JSON Schema fields ($schema or type, properties)
+        - Verify required character fields are defined (name, description, visual traits)
+        - If file not found: WARN "character-schema.json not found"
+        - If invalid JSON: FAIL "character-schema.json is not valid JSON"
+        - If missing required schema fields: FAIL "character-schema.json is incomplete"
+        - If valid: PASS
+      </action>
+      <action>
+        CHECK [SCH-002]: Existing identity.json Files Validate Against character-schema.json
+        - Scan _cookie/**/characters/**/identity.json recursively
+        - For each identity.json found:
+          - Parse as JSON
+          - Validate against character-schema.json (if SCH-001 passed)
+          - Check all required fields are present and non-empty
+          - If validation fails: FAIL "identity.json at {path} does not conform to character-schema.json: {details}"
+          - If valid: PASS
+        - If no identity.json files found: INFO "No character identity files found (not an error)"
+      </action>
+      <action>
+        CHECK [SCH-003]: SSD Template Is Valid YAML
+        - Locate the SSD (Scene Specification Document) template file(s)
+        - Parse as YAML
+        - Verify required SSD structure: scenes array, each scene has id, description, duration
+        - If file not found: WARN "SSD template not found"
+        - If invalid YAML: FAIL "SSD template is not valid YAML"
+        - If missing required structure: FAIL "SSD template is missing required fields"
+        - If valid: PASS
+      </action>
+      <action>
+        CHECK [SCH-004]: Format-Presets Aspect Ratios Are Producible
+        - Read format-presets.yaml
+        - For each preset, extract the aspect_ratio value
+        - Verify each aspect ratio is producible by the configured video generation tool (VEO)
+        - Valid producible aspect ratios: 16:9, 9:16 (VEO constraints)
+        - If a preset specifies an unsupported aspect ratio: WARN "Preset {name} has aspect ratio {ratio} which is not natively supported by VEO"
+        - If all presets are producible: PASS
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 8.6: VALIDATE PATH RESOLUTION AND CROSS-REFERENCES          -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="8.6" name="Path Resolution and Cross-Reference Integrity" category="references">
+    <description>Verify all ref: path patterns resolve and cross-references between agents, workflows, and manifests are consistent.</description>
+    <actions>
+      <action>
+        CHECK [REF-001]: All ref: Path Patterns Resolve to Existing Files
+        - Scan all YAML files under _cookie/ for values containing "ref:" patterns
+        - For each ref: value, extract the referenced path
+        - Resolve the path relative to the file's location and project root
+        - Substitute known variables ({project-root}, {installed_path}, etc.) before checking
+        - If resolved path does not exist on the filesystem: FAIL "Broken ref: {ref_value} in {file} does not resolve"
+        - If all ref: paths resolve: PASS
+      </action>
+      <action>
+        CHECK [REF-002]: All {installed_path} Variables Resolve Correctly
+        - For each workflow.yaml, extract the installed_path value
+        - Substitute {project-root} with actual project root
+        - Verify the resulting directory exists
+        - Verify files referenced via {installed_path} (instructions, validation) exist within that directory
+        - If directory or referenced files missing: FAIL "{installed_path} resolves to non-existent path"
+        - If all resolve: PASS
+      </action>
+      <action>
+        CHECK [REF-003]: Cross-Reference Integrity -- Workflows to Manifests
+        - Collect all workflow_id values from workflow.yaml files
+        - Collect all agent values from workflow.yaml files
+        - Verify every agent referenced in a workflow.yaml exists as an entry in agent-manifest.csv
+        - Verify every workflow_id could be invoked by the agents listed in the manifests
+        - If an agent is referenced in a workflow but missing from agent-manifest.csv: FAIL "Agent {agent} referenced in {workflow} but not in agent-manifest.csv"
+        - If consistent: PASS
+      </action>
+      <action>
+        CHECK [REF-004]: Cross-Reference Integrity -- Agent Files to Manifests
+        - Scan _cookie/**/agents/*.md for all agent definition files
+        - For each agent file, extract the agent identifier
+        - Verify a matching entry exists in agent-manifest.csv
+        - Verify the manifest entry's file path points back to this agent file
+        - If agent file exists but is not in manifest: FAIL "Agent file {path} has no manifest entry"
+        - If manifest entry points to wrong file: FAIL "Manifest entry for {agent_id} points to {wrong_path}"
+        - If all consistent: PASS
+      </action>
+      <action>
+        CHECK [REF-005]: Cross-Reference Integrity -- Skills to Manifests
+        - For each required_skills entry in workflow.yaml files, resolve the path
+        - Verify the skill file exists
+        - Verify a corresponding entry exists in skill-manifest.csv
+        - If skill referenced but not in manifest: WARN "Skill at {path} used in workflow but not in skill-manifest.csv"
+        - If all consistent: PASS
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 9: COMPILE REPORT                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="9" name="Compile Report">
+    <description>Compile all results into the final validation report.</description>
+    <actions>
+      <action>
+        Calculate:
+        - overall_status: "PASS" if failed == 0, "FAIL" otherwise
+        - Sort results by severity (errors first, then warnings)
+        - Group results by category
+        - Record end timestamp and compute duration_seconds
+      </action>
+      <action>Ensure _cookie/validation/ directory exists</action>
+      <action>Write framework-validation-report.yaml</action>
+      <action>
+        Generate auto-fix suggestions for common failures:
+        - Missing manifest entry -> Suggest the CSV row to add (with all fields pre-filled from the discovered file)
+        - Phantom manifest entry -> Suggest removing the row or creating the missing file
+        - Missing help CSV entry -> Suggest the CSV row to add for the undocumented command
+        - Broken file path reference -> Suggest the corrected path based on closest match found on filesystem
+        - Unresolved variable -> Suggest adding the variable to the appropriate config file
+        - Invalid identity.json -> List the specific fields that need correction
+        - Missing SKILL.md -> Suggest creating the file with a template
+        - Include auto-fix suggestions in the report under the "auto_fix" key per result entry
+        - Mark each suggestion with confidence: "high" (safe to auto-apply), "medium" (review recommended), "low" (manual intervention needed)
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT SCHEMA                                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output_schema>
+    <![CDATA[
+# framework-validation-report.yaml
+
+framework: "COOKIE"
+validated_at: "{ISO-8601 timestamp}"
+duration_seconds: {float}
+
+summary:
+  overall_status: "{PASS|FAIL}"
+  total_checks: {int}
+  passed: {int}
+  warnings: {int}
+  failed: {int}
+
+by_category:
+  - category: "Workflow Integrity"
+    category_id: "WF"
+    total: {int}
+    passed: {int}
+    warnings: {int}
+    failed: {int}
+  - category: "Slash Command Integrity"
+    category_id: "CMD"
+    total: {int}
+    passed: {int}
+    warnings: {int}
+    failed: {int}
+  - category: "Config Inheritance"
+    category_id: "CFG"
+    total: {int}
+    passed: {int}
+    warnings: {int}
+    failed: {int}
+  - category: "Pricing Coverage"
+    category_id: "PRC"
+    total: {int}
+    passed: {int}
+    warnings: {int}
+    failed: {int}
+  - category: "Resolution Profiles"
+    category_id: "RES"
+    total: {int}
+    passed: {int}
+    warnings: {int}
+    failed: {int}
+  - category: "Help CSV Coverage"
+    category_id: "HLP"
+    total: {int}
+    passed: {int}
+    warnings: {int}
+    failed: {int}
+  - category: "Manifest Integrity"
+    category_id: "MAN"
+    total: {int}
+    passed: {int}
+    warnings: {int}
+    failed: {int}
+  - category: "Schema Validation"
+    category_id: "SCH"
+    total: {int}
+    passed: {int}
+    warnings: {int}
+    failed: {int}
+  - category: "Path Resolution and Cross-References"
+    category_id: "REF"
+    total: {int}
+    passed: {int}
+    warnings: {int}
+    failed: {int}
+
+results:
+  - rule_id: "{rule_id}"
+    category: "{category_name}"
+    name: "{rule name}"
+    severity: "{error|warning}"
+    status: "{pass|warn|fail}"
+    details: "{description of findings}"
+    affected_files: ["{file_path}", ...]
+    auto_fix:
+      available: {true|false}
+      confidence: "{high|medium|low}"
+      description: "{what the fix would do}"
+      fix_action: "{specific action: add_row, remove_row, update_path, create_file, etc.}"
+      fix_data: "{pre-filled data for the fix, e.g. CSV row content or corrected path}"
+
+manifest_counts:
+  agent_manifest:
+    expected_rows: 13
+    actual_rows: {int}
+    status: "{pass|fail}"
+  task_manifest:
+    expected_rows: 10
+    actual_rows: {int}
+    status: "{pass|fail}"
+  skill_manifest:
+    expected_rows: 8
+    actual_rows: {int}
+    status: "{pass|fail}"
+
+recommendations:
+  - priority: "{high|medium|low}"
+    rule_id: "{rule_id}"
+    message: "{actionable recommendation}"
+    ]]>
+  </output_schema>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ERROR HANDLING                                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <error_handling>
+    <error condition="_cookie/ directory not found">
+      <action>HALT: "COOKIE framework directory not found at _cookie/. Cannot validate."</action>
+    </error>
+    <error condition=".claude/commands/ directory not found">
+      <action>WARN: "Slash commands directory not found." Skip CMD checks.</action>
+    </error>
+    <error condition="_config/ directory not found">
+      <action>WARN: "Configuration directory not found." Skip CFG and PRC checks.</action>
+    </error>
+    <error condition="Manifest file not found">
+      <action>FAIL the corresponding MAN check: "{manifest_file} not found."</action>
+    </error>
+    <error condition="YAML/CSV parse error">
+      <action>FAIL the check for that file: "Failed to parse {file}: {error_details}". Continue with remaining checks.</action>
+    </error>
+    <error condition="Permission denied">
+      <action>WARN: "Cannot read {file}: permission denied." Continue with remaining checks.</action>
+    </error>
+  </error_handling>
+
+</task>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>record-screen-capture</workflow>
+    <description>Capture screen recordings via Playwright</description>
+    <agent>demo-producer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_ssd_and_extract_recordings">
+      <action>Load the SSD and extract all scenes with scene_type "screen-recording". For each, collect: scene_id, target URL, viewport dimensions (width, height), device emulation settings (if mobile), action sequence (clicks, scrolls, typing, navigation), timing for each action, annotation specifications (highlights, arrows, callouts), and recording duration.</action>
+      <output>Screen recording scene queue with full specifications</output>
+    </step>
+
+    <step id="2" name="configure_playwright">
+      <action>For each screen recording scene, configure the Playwright browser instance: set the viewport to match the SSD-specified dimensions, configure device emulation if needed (mobile, tablet), set the recording output resolution and frame rate, configure any browser settings (dark mode, language, timezone), and set up network conditions if specified (throttling, offline simulation).</action>
+      <output>Configured Playwright instance per recording scene</output>
+    </step>
+
+    <step id="3" name="navigate_and_setup">
+      <action>Launch the Playwright browser with the configured settings. Navigate to the target URL. Wait for the page to fully load (network idle). If login or setup steps are required, execute them before starting the recording. Verify the page matches expected state before proceeding.</action>
+      <output>Browser ready at target URL with verified state</output>
+    </step>
+
+    <step id="4" name="execute_action_sequence">
+      <action>Start the screen recording. Execute the action sequence with precise timing as specified in the SSD: clicks (with coordinates or selectors), scroll actions (direction, distance, speed), keyboard input (typing with realistic delays), hover effects, page navigation, wait periods, and any custom interactions. Each action includes a timing offset from recording start.</action>
+      <output>Recorded action sequence video</output>
+    </step>
+
+    <step id="5" name="apply_annotations">
+      <action>Apply visual annotations as specified in the SSD: highlight rectangles (colored borders around UI elements), arrows pointing to specific elements, callout boxes with text labels, cursor emphasis effects, zoom-in regions, and blur/redaction of sensitive areas. Position each annotation according to the SSD coordinates and timing.</action>
+      <output>Annotated recording with visual overlays</output>
+    </step>
+
+    <step id="6" name="save_recording">
+      <action>Save the final recording to episodes/{episode_id}/assets/video/{scene_id}/recording.mp4. Verify the recording resolution matches the SSD specification, the duration matches the expected timing, and all actions are visible. Create a metadata file with: scene_id, url, viewport, actions_count, duration, annotations_count. Note: screen recordings have no API cost.</action>
+      <output>Saved recording with metadata, zero API cost</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Recordings match SSD configuration for viewport and resolution</gate>
+    <gate>All actions in the sequence were executed correctly and visibly</gate>
+    <gate>Annotations are positioned correctly and appear at the right timing</gate>
+    <gate>Recording resolution matches the SSD specification</gate>
+    <gate>Recording duration matches the expected timing</gate>
+    <gate>Page loaded fully before recording started</gate>
+    <gate>No sensitive information visible (blurred or redacted where specified)</gate>
+  </quality-gates>
+</instructions>

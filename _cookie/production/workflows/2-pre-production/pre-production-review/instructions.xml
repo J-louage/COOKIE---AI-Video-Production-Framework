@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>pre-production-review</workflow>
+    <description>Final pre-production review gate before asset generation</description>
+    <agent>storyboard-artist</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_all_artifacts">
+      <action>Load all pre-production artifacts: SSD (scene-spec.yaml), character sheets (all identity.json files), style guide (style-guide.yaml), dependency graph (dependency-graph.yaml), prompt library (prompt-library.yaml), and budget configuration. Verify each file exists and is parseable. Flag any missing artifacts immediately.</action>
+      <output>All pre-production artifacts loaded with availability status</output>
+    </step>
+
+    <step id="2" name="run_automated_validation">
+      <action>Run T6 (validate-ssd) to check the SSD for schema compliance, completeness, and internal consistency. Run T7 (validate-characters) for each character referenced in the SSD to check identity schema compliance and prompt token quality. Collect all validation results into a single report.</action>
+      <output>Automated validation report (T6 + T7 results)</output>
+    </step>
+
+    <step id="3" name="director_review_narrative">
+      <action>Present the SSD to the director role for narrative review: evaluate scene flow and transitions, verify the story arc is compelling, check that the hook is strong enough, assess pacing across all scenes, verify character usage is purposeful, and confirm visual directions support the narrative intent. Collect director notes.</action>
+      <output>Director narrative review notes</output>
+    </step>
+
+    <step id="4" name="producer_review_cost">
+      <action>Present the cost estimate to the producer role for budget review: compare total estimated cost against budget limits, identify the most expensive scenes, flag scenes where cost could be reduced without quality loss, verify the re-generation buffer is adequate, and check if any cost optimizations are available (scene reuse, simpler compositions). Collect producer notes.</action>
+      <output>Producer cost review notes with optimization suggestions</output>
+    </step>
+
+    <step id="5" name="present_summary">
+      <action>Compile a pre-production summary dashboard showing: total scenes and clips, total estimated duration, total estimated cost vs budget, automated validation status (pass/fail counts), director review highlights, producer review highlights, dependency graph summary (waves, critical path), and overall readiness assessment.</action>
+      <output>Pre-production summary dashboard</output>
+    </step>
+
+    <step id="6" name="review_gate">
+      <action>Present the summary for final decision. Gate outcomes: APPROVED means all asset generation workflows can proceed, with any minor notes attached as non-blocking items. NOT APPROVED means specific items must be addressed first, with clear iteration instructions pointing to the relevant pre-production workflow (revise SSD, update characters, adjust prompts, etc.). Record the decision with timestamp, reviewer, and any conditions.</action>
+      <output>Gate decision record with conditions and next steps</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>SSD passes T6 validation without critical errors</gate>
+    <gate>All characters pass T7 validation</gate>
+    <gate>Total estimated cost is within the defined budget limits</gate>
+    <gate>Narrative flow is approved by director review</gate>
+    <gate>All pre-production artifacts are complete and present</gate>
+    <gate>Dependency graph has no unresolved dependencies</gate>
+    <gate>Prompt library covers all scenes and clips</gate>
+    <gate>Review decision is recorded with timestamp and reviewer</gate>
+  </quality-gates>
+</instructions>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>build-dependency-graph</workflow>
+    <description>Build asset dependency graph from SSD for parallel execution planning</description>
+    <agent>storyboard-artist</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_ssd">
+      <action>Load the complete Scene Specification Document from episodes/{episode_id}/ssd/scene-spec.yaml. Parse all scenes, clips, audio configurations, and asset references. Build an inventory of every asset that needs to be produced.</action>
+      <output>Complete asset inventory from SSD</output>
+    </step>
+
+    <step id="2" name="identify_all_assets">
+      <action>Categorize all required assets by type: character reference images (multi-angle sets per character per style), first frames (Nano Banana generated images for VEO input), last frames (for multi-clip interpolation), video clips (VEO generated), narration audio (ElevenLabs generated), music tracks (sourced or generated), sound effects (sourced or generated), screen recordings (Playwright captured), and text overlays (Remotion rendered). Assign each asset a unique asset ID.</action>
+      <output>Categorized asset inventory with unique IDs</output>
+    </step>
+
+    <step id="3" name="build_dependency_graph">
+      <action>Build the directed acyclic graph (DAG) of asset dependencies. Core dependency chains: character-refs must complete before first-frames, first-frames must complete before video-clips (image-to-video), video-clips in multi-clip scenes must be sequential (each needs previous clip's last frame), all video clips must complete before merge. Parallel tracks: narration generation runs parallel to video generation, music/SFX sourcing runs parallel to video generation, screen recordings run parallel to AI generation.</action>
+      <output>Dependency graph as a DAG structure</output>
+    </step>
+
+    <step id="4" name="identify_parallel_opportunities">
+      <action>Analyze the dependency graph to identify maximum parallelism. Group assets into execution waves: Wave 1 (no dependencies: character refs, narration, music/SFX, screen recordings), Wave 2 (depends on Wave 1: first frames from character refs), Wave 3 (depends on Wave 2: video clips), Wave 4 (depends on Wave 3: multi-clip merges, final assembly). Within each wave, identify which assets can execute simultaneously.</action>
+      <output>Execution wave plan with parallel groupings</output>
+    </step>
+
+    <step id="5" name="save_dependency_graph">
+      <action>Save the dependency graph as a YAML file at episodes/{episode_id}/planning/dependency-graph.yaml. Include: nodes (asset ID, type, status, estimated duration, estimated cost), edges (from asset, to asset, dependency type), waves (wave number, assets in wave, estimated wave duration), and critical path (longest sequential chain).</action>
+      <output>Saved dependency-graph.yaml</output>
+    </step>
+
+    <step id="6" name="output_execution_plan">
+      <action>Generate a human-readable execution plan summarizing: total assets to produce, number of execution waves, estimated total production time (sequential vs parallel), critical path duration, cost estimate per wave, and recommended execution order. This plan guides the asset generation phase.</action>
+      <output>Execution plan document with timing and cost estimates</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All assets from the SSD are accounted for in the dependency graph</gate>
+    <gate>No circular dependencies exist in the graph</gate>
+    <gate>Parallel execution opportunities are identified and grouped into waves</gate>
+    <gate>Character reference images are always scheduled before video generation</gate>
+    <gate>First frames are scheduled before their dependent video clips</gate>
+    <gate>Multi-clip scenes have sequential dependencies between clips</gate>
+    <gate>Critical path is identified and estimated</gate>
+  </quality-gates>
+</instructions>

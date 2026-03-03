@@ -1,0 +1,44 @@
+name: create-scene-spec
+workflow_id: create-scene-spec
+module: production
+agent: storyboard-artist
+slash_command: /production-create-scene-spec
+description: "Create Scene Specification Document (SSD) from canonical script"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/2-pre-production/create-scene-spec"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/veo/SKILL.md"
+  - "{project-root}/_cookie/skills/nano-banana/SKILL.md"
+  - "{project-root}/_cookie/skills/shared/aspect-ratio-guide.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "ssd_validates_against_schema == true"
+    - check: "every_scene_has_complete_config == true"
+    - check: "durations_valid_per_model == true"
+    - check: "multi_clip_scenes_properly_split == true"
+    - check: "cost_estimate_included == true"
+
+input_file_patterns:
+  canonical_script:
+    path: "{project-root}/episodes/{episode_id}/script/canonical-script.md"
+    load_strategy: "FULL_LOAD"
+  format_presets:
+    path: "{project-root}/_cookie/_config/format-presets.yaml"
+    load_strategy: "FULL_LOAD"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"
+  style_guide:
+    path: "{project-root}/episodes/{episode_id}/style/style-guide.yaml"
+    load_strategy: "FULL_LOAD"
+  veo_constraints:
+    path: "{project-root}/_cookie/_config/veo-constraints.yaml"
+    load_strategy: "FULL_LOAD"

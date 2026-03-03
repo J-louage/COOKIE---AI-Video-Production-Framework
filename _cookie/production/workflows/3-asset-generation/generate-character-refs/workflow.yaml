@@ -1,0 +1,36 @@
+name: generate-character-refs
+workflow_id: generate-character-refs
+module: production
+agent: character-designer
+slash_command: /production-generate-character-refs
+description: "Generate multi-angle character reference images via Nano Banana"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/3-asset-generation/generate-character-refs"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/nano-banana/SKILL.md"
+  - "{project-root}/_cookie/skills/image-editing/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "all_angles_generated == true"
+    - check: "visual_consistency_verified == true"
+    - check: "composite_sheet_created == true"
+    - check: "files_at_correct_paths == true"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"
+  style_guide:
+    path: "{project-root}/episodes/{episode_id}/style/style-guide.yaml"
+    load_strategy: "FULL_LOAD"

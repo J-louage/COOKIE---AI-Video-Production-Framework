@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>quick-social</workflow>
+    <description>Rapid social media clip generation for TikTok, Reels, and Shorts</description>
+    <agent>director</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="receive_concept_and_platform">
+      <action>Receive the social clip concept from the user. Determine the target platform: TikTok, Instagram Reels, or YouTube Shorts. Auto-set format parameters: aspect ratio 9:16, social-short format preset, duration between 15-60 seconds (default: 30s). Ask the user for the concept and any specific requirements. Keep this to a single interaction.</action>
+      <output>Social clip concept with platform and duration</output>
+    </step>
+
+    <step id="2" name="generate_micro_script">
+      <action>Generate a micro-script optimized for social media. Enforce social media best practices: hook in the first 1.5 seconds (attention-grabbing opening), fast pacing (3-6 scenes max, each 4-8 seconds), CTA or payoff at the end. Generate a narration text if the concept benefits from voiceover. Keep the script concise — every second counts in short-form content.</action>
+      <output>Micro-script with 3-6 scenes, hook, and CTA</output>
+    </step>
+
+    <step id="3" name="generate_social_ssd">
+      <action>Convert the micro-script into a social-optimized SSD. Set all scenes to 9:16 aspect ratio. Use VEO at 720p resolution (standard for mobile viewing). Enable TikTok-style captions (caption-tiktok component) for all scenes. Set fast transitions between scenes. If narration was generated, add it to the audio configuration. Apply negative prompt optimized for mobile: "blurry, low quality, watermark, text, distorted, horizontal framing".</action>
+      <output>Social-optimized SSD with 9:16 aspect ratio and captions</output>
+    </step>
+
+    <step id="4" name="cost_estimate">
+      <action>Calculate a quick cost estimate. Count VEO calls (one per scene, 3-6 scenes). Add ElevenLabs cost if narration is included. Apply a 10% buffer. Present the estimate to the user. This is the primary cost interaction point.</action>
+      <output>Cost estimate approved</output>
+    </step>
+
+    <step id="5" name="generate_assets">
+      <action>Generate all assets in parallel where possible. Submit VEO text-to-video requests for each scene at 9:16 aspect ratio. If narration included, generate via ElevenLabs in parallel with video. Log each generation cost to actuals. Use VEO native audio for ambient sound.</action>
+      <output>Video clips and narration (if any) generated</output>
+    </step>
+
+    <step id="6" name="compose_with_captions">
+      <action>Assemble the Remotion composition with social-optimized settings. Add TikTok-style captions (word-by-word highlight) synced to the narration or scene text. Ensure the hook scene is visually compelling in the first 1.5 seconds. Add CTA text overlay at the end. Apply fast cuts between scenes (no slow dissolves). If narration exists, sync audio with automatic ducking of VEO native audio.</action>
+      <output>Social clip composition with captions assembled</output>
+    </step>
+
+    <step id="7" name="render_and_deliver">
+      <action>Render the social clip at 720p in 9:16 format. Use the appropriate FFmpeg encoding preset for the target platform (tiktok-720p, instagram-reels, or youtube-shorts equivalent). Run automated QA: verify 9:16 aspect ratio, verify duration is 15-60 seconds, verify captions are present, verify hook is in first 1.5 seconds. Present the final clip to the user. Log total cost.</action>
+      <output>Social clip rendered and ready for upload</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Concept captured with platform and duration</gate>
+    <gate>Micro-script has hook in first 1.5 seconds</gate>
+    <gate>Micro-script has CTA or payoff at end</gate>
+    <gate>SSD uses 9:16 aspect ratio for all scenes</gate>
+    <gate>TikTok-style captions enabled</gate>
+    <gate>Cost estimate approved</gate>
+    <gate>All video clips generated at 9:16</gate>
+    <gate>Captions synced and displayed correctly</gate>
+    <gate>Final clip is 15-60 seconds at 720p 9:16</gate>
+    <gate>Total cost logged</gate>
+  </quality-gates>
+</instructions>

@@ -1,0 +1,11 @@
+task_id,name,path,priority,description
+T1,help,core/tasks/help.md,P0,Context-sensitive help routing
+T2,cost-estimate,core/tasks/cost-estimate.xml,P0,Calculate estimated cost from SSD before generation
+T3,cost-report,core/tasks/cost-report.xml,P0,Generate final cost report for episode or project
+T4,asset-inventory,core/tasks/asset-inventory.xml,P0,List all generated assets with status and versions
+T5,format-adapt,core/tasks/format-adapt.xml,P0,Generate derived SSD for alternate format from primary SSD
+T6,validate-ssd,core/tasks/validate-ssd.xml,P0,Validate SSD against tool constraints
+T7,validate-character,core/tasks/validate-character.xml,P0,Validate character sheet against schema
+T8,merge-scenes,core/tasks/merge-scenes.xml,P0,Merge multiple VEO clips into continuous scene via FFmpeg concat
+T9,review-continuity,core/tasks/review-continuity.xml,P1,Check visual continuity across scene boundaries
+T10,validate-framework,core/tasks/validate-framework.xml,P0,Scan all files and commands and paths for consistency

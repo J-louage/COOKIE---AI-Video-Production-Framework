@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>generate-video-clips</workflow>
+    <description>Generate video clips via VEO API following SSD and dependency graph</description>
+    <agent>cinematographer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_and_verify_prerequisites">
+      <action>Load the SSD, dependency graph, prompt library, character references, and generated frames. Verify all prerequisites are met: character reference images exist for all referenced characters, first frames exist for all image-to-video clips, prompt library entries exist for all clips. Halt if any prerequisite is missing.</action>
+      <output>Prerequisite verification report (all clear or blocked items)</output>
+    </step>
+
+    <step id="2" name="cost_gate_initial">
+      <action>Calculate the total estimated cost for all video clip generation based on the SSD cost estimates. Compare against the remaining budget. If estimated cost exceeds remaining budget, present options: proceed with P0 scenes only, reduce quality settings, or request budget increase. Log the cost gate decision.</action>
+      <output>Cost gate decision (proceed, partial, or halt)</output>
+    </step>
+
+    <step id="3" name="process_clips_in_dependency_order">
+      <action>Process clips following the dependency graph order. For single-clip scenes: generate directly. For multi-clip scenes: process sequentially within the scene (first clip, then extract last frame for next clip's first frame, then generate next clip, repeat). Between scenes with no dependencies, process in parallel where possible.</action>
+      <output>Ordered clip generation queue</output>
+    </step>
+
+    <step id="4" name="extract_first_frame_if_needed">
+      <action>For clips requiring first-frame extraction from a previous clip (multi-clip middle and last clips), use ffmpeg to extract the last frame: ffmpeg -sseof -0.1 -i {previous_clip}.mp4 -frames:v 1 -q:v 2 {clip_id}-first-frame.png. Verify the extracted frame quality and resolution. This frame becomes the image input for the next clip's image-to-video generation.</action>
+      <output>Extracted first frames for dependent clips</output>
+    </step>
+
+    <step id="5" name="build_veo_request">
+      <action>For each clip, build the VEO API request using the SSD configuration: model (veo-2 or veo-3), input_mode (text-to-video, image-to-video, or interpolation), number of frames, reference_images (character reference image paths), prompt (from prompt library), duration_seconds, resolution, speed (normal, slow-mo, timelapse), aspect_ratio, and person_generation setting. Validate the request against VEO API constraints before sending.</action>
+      <output>Validated VEO API request per clip</output>
+    </step>
+
+    <step id="6" name="call_veo_api">
+      <action>Submit the VEO API request and wait for generation to complete. Handle API responses: success (download video), rate limiting (wait and retry), generation failure (log error, retry up to 2 times with slight prompt variation), and timeout (retry once). Log the actual cost charged by the API.</action>
+      <output>Generated video clip file</output>
+    </step>
+
+    <step id="7" name="save_video_and_metadata">
+      <action>Save the generated video clip to episodes/{episode_id}/assets/video/{scene_id}/{clip_id}.mp4. Create a companion meta.json file at the same path containing: scene_id, clip_id, veo_model, input_mode, duration, resolution, speed, cost, generated_at (ISO timestamp), prompt_hash (SHA-256 of the prompt used), and version number.</action>
+      <output>Saved video file and meta.json</output>
+    </step>
+
+    <step id="8" name="merge_multi_clip_scenes">
+      <action>For multi-clip scenes, after all clips are generated, merge them using ffmpeg concat demuxer: create a concat list file, run ffmpeg -f concat -safe 0 -i list.txt -c copy {scene_id}-merged.mp4. Verify the merged video duration matches the SSD target for the scene. Save the merged file alongside the individual clips.</action>
+      <output>Merged video files for multi-clip scenes</output>
+    </step>
+
+    <step id="9" name="validate_output">
+      <action>For each generated clip and merged scene: verify duration matches the SSD specification (within 0.5s tolerance), verify resolution matches the SSD specification, verify the video codec is correct, and spot-check visual quality. Flag any clips that fail validation for review or regeneration.</action>
+      <output>Output validation report per clip and scene</output>
+    </step>
+
+    <step id="10" name="cost_tracking">
+      <action>Track costs at multiple levels. Per-scene cost check: warn if any single scene exceeds $5, halt if any scene exceeds $10 (requires explicit user approval to continue). Cumulative cost check: warn when total cost reaches 80% of budget, halt when total cost reaches 120% of budget. Log all costs to the episode cost tracker.</action>
+      <output>Cost tracking report with warnings and halts</output>
+    </step>
+
+    <step id="11" name="mark_complete">
+      <action>Update the dependency graph to mark all completed video clips and merged scenes. Update each clip's status in the SSD. Log the total video generation cost, total clips generated, total regenerations needed, and overall success rate. Unblock downstream workflows (assembly, QA).</action>
+      <output>Completion status with metrics and cost summary</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All clips specified in the SSD are generated successfully</gate>
+    <gate>Clip durations match SSD specifications within 0.5s tolerance</gate>
+    <gate>Clip resolutions match SSD specifications exactly</gate>
+    <gate>Multi-clip scenes are merged via ffmpeg concat</gate>
+    <gate>Merged scene durations match total SSD scene duration</gate>
+    <gate>Per-scene cost does not exceed $10 without explicit approval</gate>
+    <gate>Cumulative cost does not exceed 120% of budget without approval</gate>
+    <gate>meta.json created for every generated clip</gate>
+    <gate>All prerequisite first frames and character refs were available</gate>
+  </quality-gates>
+</instructions>

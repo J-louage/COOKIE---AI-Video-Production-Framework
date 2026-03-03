@@ -1,0 +1,36 @@
+name: generate-music-sfx
+workflow_id: generate-music-sfx
+module: production
+agent: sound-designer
+slash_command: /production-generate-music-sfx
+description: "Source and prepare music and sound effects"
+priority: P1
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/3-asset-generation/generate-music-sfx"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/prompt-engineering.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "all_referenced_music_exists == true"
+    - check: "all_referenced_sfx_exists == true"
+    - check: "copied_to_episode_assets == true"
+    - check: "missing_items_flagged == true"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  shared_music:
+    path: "{project-root}/shared-assets/music/"
+    load_strategy: "INDEX_GUIDED"
+  shared_sfx:
+    path: "{project-root}/shared-assets/sfx/"
+    load_strategy: "INDEX_GUIDED"

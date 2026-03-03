@@ -1,0 +1,42 @@
+name: final-qa
+workflow_id: final-qa
+module: production
+agent: editor
+slash_command: /production-final-qa
+description: "Perform comprehensive quality assurance on all final exports and generate QA report"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/5-post-production/final-qa"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/ffmpeg/SKILL.md"
+
+input_file_patterns:
+  exports:
+    path: "{project-root}/episodes/{episode_id}/exports/"
+    load_strategy: "INDEX_GUIDED"
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  subtitles:
+    path: "{project-root}/episodes/{episode_id}/exports/subtitles/"
+    load_strategy: "INDEX_GUIDED"
+  thumbnails:
+    path: "{project-root}/episodes/{episode_id}/exports/thumbnails/"
+    load_strategy: "INDEX_GUIDED"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "all_exports_probed == true"
+    - check: "audio_levels_verified == true"
+    - check: "no_black_frames_detected == true"
+    - check: "resolution_and_aspect_verified == true"
+    - check: "file_sizes_within_limits == true"
+    - check: "subtitles_verified == true"
+    - check: "qa_report_generated == true"
+    - check: "cost_report_invoked == true"

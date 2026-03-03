@@ -1,0 +1,38 @@
+name: generate-prompt-library
+workflow_id: generate-prompt-library
+module: production
+agent: prompt-engineer
+slash_command: /production-generate-prompt-library
+description: "Expand character tokens and generate final prompts for all SSD scenes"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/2-pre-production/generate-prompt-library"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/veo/SKILL.md"
+  - "{project-root}/_cookie/skills/nano-banana/SKILL.md"
+  - "{project-root}/_cookie/skills/shared/prompt-engineering.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "all_placeholders_expanded == true"
+    - check: "all_prompts_under_1024_tokens == true"
+    - check: "character_tokens_front_loaded == true"
+    - check: "negative_prompts_present == true"
+    - check: "no_conflicting_camera_movements == true"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"
+  style_guide:
+    path: "{project-root}/episodes/{episode_id}/style/style-guide.yaml"
+    load_strategy: "FULL_LOAD"

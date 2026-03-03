@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Core Task: Validate Character (T7)
+  Invocation: <invoke-task>validate-character</invoke-task> or /cookie-validate-char
+
+  Input:  Character identity.json file
+  Output: Validation report with PASS/WARN/FAIL per check
+
+  Validates a character's identity.json against the character schema,
+  checks required fields, directory structure, cross-references,
+  voice configuration, and active selections consistency.
+-->
+<task id="T7" name="validate-character" version="1.0">
+  <metadata>
+    <description>Validate a character identity.json file against characters/character-schema.json, checking required fields, directory consistency, voice config, and active selections.</description>
+    <priority>P1</priority>
+    <phase>pre-production</phase>
+  </metadata>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- INPUTS                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <inputs>
+    <input name="identity_file" required="true">
+      <path>characters/{character_id}/identity.json</path>
+      <description>Character identity definition file to validate.</description>
+    </input>
+    <input name="character_schema" required="true">
+      <path>characters/character-schema.json</path>
+      <description>JSON Schema defining the required structure for character identity files.</description>
+    </input>
+  </inputs>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output>
+    <path>characters/{character_id}/validation-report.yaml</path>
+    <description>Validation report with pass/fail per check and detailed findings.</description>
+  </output>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1: LOAD AND PARSE IDENTITY FILE                              -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="1" name="Load Identity">
+    <description>Load and parse the character identity file and schema.</description>
+    <actions>
+      <action>Read characters/{character_id}/identity.json</action>
+      <action>Parse JSON. If parse fails, abort with syntax error details.</action>
+      <action>Read characters/character-schema.json (if exists). If not found, skip schema validation with warning.</action>
+      <action>Initialize validation counters: total_checks = 0, passed = 0, warnings = 0, failed = 0</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2: VALIDATE AGAINST JSON SCHEMA                              -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="2" name="Schema Validation">
+    <description>Validate identity.json against the character-schema.json.</description>
+    <actions>
+      <action>
+        CHECK [SCH-001]: JSON Schema Compliance
+        If character-schema.json exists:
+        - Validate identity.json against it
+        - For each schema violation: FAIL with field path and error message
+        - If no violations: PASS
+        If schema not found: WARN "character-schema.json not found -- schema validation skipped."
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3: VALIDATE REQUIRED FIELDS                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="3" name="Required Fields">
+    <description>Check that all required fields are present and valid.</description>
+    <actions>
+      <action>
+        CHECK [CHR-001]: character_id Present
+        - identity.character_id must exist and be a non-empty string
+        - If missing or empty: FAIL
+      </action>
+      <action>
+        CHECK [CHR-002]: name Present
+        - identity.name must exist and be a non-empty string
+        - If missing or empty: FAIL
+      </action>
+      <action>
+        CHECK [CHR-003]: type Present and Valid
+        - identity.type must exist and be one of: "visual-voice", "visual-only", "voice-only"
+        - If missing or invalid value: FAIL
+      </action>
+      <action>
+        CHECK [CHR-004]: prompt_tokens.core_identity Present
+        - identity.prompt_tokens.core_identity must exist and be a non-empty string
+        - This is the primary text injected into all prompts for this character
+        - If missing or empty: FAIL
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4: VALIDATE DIRECTORY CONSISTENCY                             -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="4" name="Directory Consistency">
+    <description>Verify character_id matches directory and all referenced directories exist.</description>
+    <actions>
+      <action>
+        CHECK [DIR-001]: character_id Matches Directory Name
+        - The character_id value must exactly match the name of its containing directory
+        - directory_name = basename of characters/{character_id}/
+        - If character_id != directory_name: FAIL
+      </action>
+      <action>
+        CHECK [DIR-002]: Referenced Style Directories Exist
+        For each style in identity.available_styles:
+        - Verify characters/{character_id}/styles/{style}/ directory exists
+        - If missing: FAIL "Style '{style}' listed but directory not found"
+      </action>
+      <action>
+        CHECK [DIR-003]: Referenced Outfit Directories Exist
+        For each style_key in identity.available_outfits:
+          For each outfit_name in available_outfits[style_key]:
+          - Verify characters/{character_id}/styles/{style_key}/outfits/{outfit_name}/ exists
+          - If missing: FAIL "Outfit '{outfit_name}' for style '{style_key}' directory not found"
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5: VALIDATE VOICE CONFIGURATION                              -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="5" name="Voice Configuration">
+    <description>Check voice config presence and validity based on character type.</description>
+    <actions>
+      <action>
+        CHECK [VOX-001]: Voice Config Present for Voice Types
+        If identity.type is "visual-voice" OR "voice-only":
+        - identity.voice must exist and be non-empty
+        - If voice block is missing: FAIL "Character type '{type}' requires voice configuration"
+      </action>
+      <action>
+        CHECK [VOX-002]: Voice Config Fields Complete
+        If identity.voice exists:
+        - voice.provider should be present (e.g., "elevenlabs")
+        - voice.voice_id should be present
+        - voice.language should be present
+        - If any are missing: WARN "Voice config is incomplete -- missing {field}"
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 6: VALIDATE ACTIVE SELECTIONS                                -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="6" name="Active Selections">
+    <description>Verify active_style and active_outfit point to valid entries.</description>
+    <actions>
+      <action>
+        CHECK [ACT-001]: active_style in available_styles
+        - If identity.active_style is defined:
+          - It must be one of the values in identity.available_styles
+          - If not found in available_styles: FAIL
+        - If active_style is not defined: WARN "active_style not set"
+      </action>
+      <action>
+        CHECK [ACT-002]: active_outfit in available_outfits[active_style]
+        - If both active_outfit and active_style are defined:
+          - active_outfit must be in identity.available_outfits[active_style] list
+          - If not found: FAIL "active_outfit '{active_outfit}' not in outfits for style '{active_style}'"
+        - If active_outfit defined but active_style is not: WARN "Cannot validate outfit without active style"
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 7: COMPILE AND WRITE REPORT                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="7" name="Compile Report">
+    <description>Compile all results and write the validation report.</description>
+    <actions>
+      <action>
+        Count: total_checks, passed, warnings, failed
+        overall_status: "PASS" if failed == 0, "FAIL" otherwise
+      </action>
+      <action>Write characters/{character_id}/validation-report.yaml</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT SCHEMA                                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output_schema>
+    <![CDATA[
+# validation-report.yaml
+
+character_id: "{character_id}"
+identity_path: "characters/{character_id}/identity.json"
+schema_path: "characters/character-schema.json"
+validated_at: "{ISO-8601 timestamp}"
+
+summary:
+  overall_status: "{PASS|FAIL}"
+  total_checks: {int}
+  passed: {int}
+  warnings: {int}
+  failed: {int}
+
+checks:
+  - rule_id: "{rule_id}"
+    name: "{rule name}"
+    severity: "{error|warning}"
+    status: "{pass|warn|fail}"
+    details: "{description of issue if failed, null if passed}"
+    field_path: "{JSON path to affected field}"
+
+schema_violations:
+  - field: "{JSON path}"
+    message: "{schema error message}"
+    expected: "{expected value or type}"
+    actual: "{actual value or type}"
+
+recommendations:
+  - "{actionable recommendation for each failure}"
+    ]]>
+  </output_schema>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ERROR HANDLING                                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <error_handling>
+    <error condition="Identity file not found">
+      <action>HALT: "Character identity file not found at characters/{character_id}/identity.json"</action>
+    </error>
+    <error condition="Identity JSON parse error">
+      <action>HALT: "Failed to parse identity.json: {parse_error_details}"</action>
+    </error>
+    <error condition="Schema file not found">
+      <action>WARN: "character-schema.json not found -- schema validation skipped." Continue with field-level validation.</action>
+    </error>
+    <error condition="Schema parse error">
+      <action>WARN: "Failed to parse character-schema.json -- schema validation skipped." Continue with field-level validation.</action>
+    </error>
+  </error_handling>
+
+</task>

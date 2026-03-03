@@ -1,0 +1,52 @@
+# YouTube 4K Encoding Preset
+# Ultra HD upload using H.265 (HEVC) with 10-bit color depth.
+# HEVC provides ~50% better compression than H.264 at the same quality level.
+# 10-bit color reduces banding artifacts in gradients and sky shots.
+
+preset_name: "youtube-4k"
+platform: "YouTube"
+description: "YouTube 4K Ultra HD upload — H.265 (HEVC) with 10-bit color for maximum quality and reduced banding"
+
+resolution:
+  width: 3840
+  height: 2160
+
+aspect_ratio: "16:9"
+frame_rate: 30
+
+codec_settings:
+  video_codec: "libx265"
+  pixel_format: "yuv420p10le"
+  crf: 20
+  preset: "slow"
+  profile: "main10"
+  level: null
+
+audio_settings:
+  codec: "aac"
+  bitrate: "256k"
+  sample_rate: 48000
+  channels: 2
+
+constraints:
+  max_bitrate: null
+  bufsize: null
+  max_file_size: null
+  max_duration: null
+
+ffmpeg_command: >-
+  ffmpeg -i {input}
+  -c:v libx265 -pix_fmt yuv420p10le -crf 20 -preset slow
+  -profile:v main10
+  -tag:v hvc1
+  -c:a aac -b:a 256k -ar 48000 -ac 2
+  -movflags +faststart
+  {output}.mp4
+
+# Notes:
+# - tag:v hvc1 ensures Apple/Safari compatibility for HEVC in MP4
+# - CRF 20 is lower (higher quality) than 1080p because 4K content shows compression more
+# - yuv420p10le provides 10-bit color depth to reduce banding in gradients
+# - No maxrate constraint as YouTube handles 4K bandwidth management
+# - Encoding is significantly slower than H.264; expect 2-4x longer encode times
+# - If HEVC encoding is too slow, consider using -preset medium as a compromise

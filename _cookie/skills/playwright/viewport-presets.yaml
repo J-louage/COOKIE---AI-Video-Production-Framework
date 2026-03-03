@@ -1,0 +1,82 @@
+# Playwright Viewport Presets
+# Reference these presets in SSD playwright_config.viewport
+# Record at 2x and downscale for maximum crispness
+
+presets:
+  desktop-1080p:
+    width: 1920
+    height: 1080
+    device_scale_factor: 1
+    description: "Standard 1080p desktop recording"
+
+  desktop-2x:
+    width: 3840
+    height: 2160
+    device_scale_factor: 2
+    description: "Record at 2x, render at 1920x1080 for crispness"
+
+  desktop-720p:
+    width: 1280
+    height: 720
+    device_scale_factor: 1
+    description: "Standard 720p desktop recording"
+
+  desktop-720p-2x:
+    width: 2560
+    height: 1440
+    device_scale_factor: 1
+    description: "Record at 2x, render at 1280x720 for crispness"
+
+  laptop:
+    width: 1440
+    height: 900
+    device_scale_factor: 2
+    description: "Standard laptop viewport"
+
+  tablet-landscape:
+    width: 1024
+    height: 768
+    device_scale_factor: 2
+    is_mobile: true
+    has_touch: true
+    description: "iPad landscape mode"
+
+  tablet-portrait:
+    width: 768
+    height: 1024
+    device_scale_factor: 2
+    is_mobile: true
+    has_touch: true
+    description: "iPad portrait mode"
+
+  mobile-iphone:
+    width: 390
+    height: 844
+    device_scale_factor: 3
+    is_mobile: true
+    has_touch: true
+    description: "iPhone 14/15 viewport"
+
+  mobile-iphone-plus:
+    width: 430
+    height: 932
+    device_scale_factor: 3
+    is_mobile: true
+    has_touch: true
+    description: "iPhone 14/15 Plus/Pro Max viewport"
+
+  mobile-android:
+    width: 412
+    height: 915
+    device_scale_factor: 2.625
+    is_mobile: true
+    has_touch: true
+    description: "Standard Android phone viewport"
+
+  mobile-android-small:
+    width: 360
+    height: 800
+    device_scale_factor: 3
+    is_mobile: true
+    has_touch: true
+    description: "Smaller Android phone viewport"

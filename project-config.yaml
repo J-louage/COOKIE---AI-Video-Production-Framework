@@ -1,0 +1,47 @@
+# COOKIE Project Configuration
+# This file defines project-level defaults that override global.yaml settings.
+# Copy this template and fill in your project details.
+
+project_name: ""
+project_id: ""
+
+defaults:
+  resolution_profile: "standard"  # draft | standard | hd | 4k
+  veo_model: "veo-3.0-generate-001" # veo-2.0-generate-001 | veo-3.0-generate-001
+  veo_speed: "fast"               # fast | standard
+  nano_banana_model: "gemini-3.1-flash-image-preview" # gemini-2.5-flash-image | gemini-3.1-flash-image-preview
+  aspect_ratio: "16:9"           # 16:9 | 9:16
+  person_generation: "allow_adult"  # allow_adult | dont_allow
+  brand: "ref:characters/brand/brand-config.json"
+
+episodes:
+  # - episode_id: "EP-001"
+  #   title: ""
+  #   status: "not-started"          # not-started | planning | pre-production | in-production | post-production | complete
+  #   script: "ref:episodes/EP-001/script/canonical-script.md"
+  #   format: "brand-film"
+  #   target_duration: 120
+  #   characters: []
+  #   overrides:
+  #     resolution_profile: "hd"
+
+shared_characters:
+  # - character_id: "host"
+  #   path: "ref:characters/host/"
+
+budget:
+  total_project_budget: 100.00
+  per_episode_budget: 50.00
+  alert_at_percent: 80
+  halt_at_percent: 120
+  currency: "USD"
+
+export_formats:
+  - "16:9"
+  # - "9:16"
+  # - "1:1"
+
+metadata:
+  created: ""
+  last_modified: ""
+  cookie_version: "1.0.0"

@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Core Task: Validate SSD (T6)
+  Invocation: <invoke-task>validate-ssd</invoke-task> or /cookie-validate-ssd
+
+  Input:  SSD (scene-spec.yaml)
+  Output: Validation report with PASS/WARN/FAIL per check
+
+  Validates a Scene Specification Document against VEO model constraints,
+  aspect ratio rules, resolution options, character/environment reference
+  integrity, dependency checks, and structural consistency.
+-->
+<task id="T6" name="validate-ssd" version="1.0">
+  <metadata>
+    <description>Validate a Scene Specification Document against VEO model constraints, aspect ratios, resolution options, reference integrity, and structural consistency.</description>
+    <priority>P1</priority>
+    <phase>pre-production</phase>
+  </metadata>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- INPUTS                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <inputs>
+    <input name="ssd" required="true">
+      <path>episodes/{episode_id}/ssd/scene-spec.yaml</path>
+      <description>Scene Specification Document to validate.</description>
+    </input>
+    <input name="characters_dir" required="false">
+      <path>characters/</path>
+      <description>Characters directory for reference validation.</description>
+    </input>
+    <input name="environments_dir" required="false">
+      <path>characters/environments/</path>
+      <description>Environments directory for reference validation.</description>
+    </input>
+  </inputs>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output>
+    <path>episodes/{episode_id}/validation/ssd-validation-report.yaml</path>
+    <description>Validation report with pass/fail per check, details on failures, and summary counts.</description>
+  </output>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1: LOAD AND PARSE SSD                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="1" name="Load SSD">
+    <description>Load and parse the Scene Specification Document.</description>
+    <actions>
+      <action>Read episodes/{episode_id}/ssd/scene-spec.yaml</action>
+      <action>Parse YAML. If parsing fails, abort with YAML syntax error details.</action>
+      <action>Initialize validation counters: total_checks = 0, passed = 0, warnings = 0, failed = 0</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2: VALIDATE VEO MODEL CONSTRAINTS                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="2" name="VEO Model Constraints">
+    <description>Check every VEO scene against model-specific duration and aspect ratio constraints.</description>
+    <actions>
+      <action>
+        CHECK [VEO-DUR-3.1]: VEO 3.1 Duration Validity
+        For scenes using VEO 3.1 (veo-3.0-generate-001):
+        - Duration MUST be exactly 4, 6, or 8 seconds
+        - If duration is not in [4, 6, 8]: FAIL
+      </action>
+      <action>
+        CHECK [VEO-DUR-2.0]: VEO 2.0 Duration Validity
+        For scenes using VEO 2.0 (veo-2.0-generate-001):
+        - Duration MUST be exactly 5, 6, 7, or 8 seconds
+        - If duration is not in [5, 6, 7, 8]: FAIL
+      </action>
+      <action>
+        CHECK [VEO-AR]: VEO Aspect Ratio Validity
+        For ALL VEO scenes regardless of model version:
+        - Aspect ratio MUST be either "16:9" or "9:16"
+        - No other aspect ratios are supported by VEO
+        - If aspect_ratio is not in ["16:9", "9:16"]: FAIL
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3: VALIDATE RESOLUTION OPTIONS                                -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="3" name="Resolution Validation">
+    <description>Verify resolution profiles match Nano Banana and VEO valid options.</description>
+    <actions>
+      <action>
+        CHECK [RES-NB]: Nano Banana Resolution Options
+        For scenes using Nano Banana / Imagen for frame generation:
+        - Verify resolution is a valid Nano Banana option from the model constraints
+        - Valid resolutions depend on the specific model variant
+        - If invalid: FAIL with message showing valid options
+      </action>
+      <action>
+        CHECK [RES-VEO]: VEO Resolution Options
+        For VEO scenes:
+        - Verify resolution is valid for the model + speed combination
+        - If invalid: FAIL
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4: VALIDATE CHARACTER REFERENCES                              -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="4" name="Character References">
+    <description>Verify all character references point to existing character directories.</description>
+    <actions>
+      <action>
+        CHECK [REF-CHAR]: Character Refs Exist in characters/ Directory
+        For each scene that references characters (via character_refs, prompt tokens, etc.):
+        - Extract all character names/IDs referenced
+        - Verify characters/{character_id}/ directory exists
+        - If directory not found: FAIL
+        - If characters/ directory itself is missing: WARN and skip this check
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5: VALIDATE ENVIRONMENT REFERENCES                           -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="5" name="Environment References">
+    <description>Verify all environment references resolve to existing definitions.</description>
+    <actions>
+      <action>
+        CHECK [REF-ENV]: Environment Refs Exist
+        For each scene with environment references:
+        - Verify the referenced environment definition exists
+        - If not found: FAIL
+        - If characters/environments/ directory is missing: WARN and skip
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 6: VALIDATE DEPENDENCY INTEGRITY                              -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="6" name="Dependency Integrity">
+    <description>Check for orphan dependencies and ensure all ref: paths resolve.</description>
+    <actions>
+      <action>
+        CHECK [DEP-ORPHAN]: No Orphan Dependencies
+        Scan all scene fields for cross-references to other scenes, clips, or assets.
+        For each dependency reference:
+        - Verify the target exists (either as a scene_id, clip, or file)
+        - If target is missing: WARN "Orphan dependency: {source} references {target}"
+      </action>
+      <action>
+        CHECK [DEP-REF]: All ref: Paths Resolve
+        Scan all string values in the SSD for the "ref:" prefix pattern.
+        For each ref: path found:
+        - Strip the "ref:" prefix
+        - Resolve relative to project root
+        - If file/directory does not exist: FAIL "ref: path '{path}' does not resolve"
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 7: VALIDATE STRUCTURAL CONSISTENCY                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="7" name="Structural Consistency">
+    <description>Check internal consistency of the SSD structure.</description>
+    <actions>
+      <action>
+        CHECK [STR-DUR]: Total Duration Matches Sum of Scene Durations
+        calculated_total = sum(scene.duration for all scenes)
+        declared_total = ssd.total_duration_seconds
+        If calculated_total != declared_total: FAIL
+      </action>
+      <action>
+        CHECK [STR-COUNT]: Scene Count Matches
+        If ssd.scene_count != length(ssd.scenes[]): FAIL
+      </action>
+      <action>
+        CHECK [STR-UNIQUE]: Unique Scene IDs
+        All scene_id values must be unique. If duplicates found: FAIL
+      </action>
+      <action>
+        CHECK [STR-FIELDS]: Required Scene Fields Present
+        Every scene must have: scene_id, duration, tool, prompt (or equivalent)
+        If any required field is missing: FAIL
+      </action>
+      <action>
+        CHECK [STR-ORDER]: Scene Order Continuity
+        Scene order numbers should be sequential starting from 1 with no gaps
+        If gaps found: WARN
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 8: COMPILE AND WRITE REPORT                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="8" name="Compile Report">
+    <description>Compile all results into the validation report.</description>
+    <actions>
+      <action>
+        Count totals: total_checks, passed, warnings, failed
+        overall_status: "PASS" if failed == 0, "FAIL" otherwise
+      </action>
+      <action>Ensure episodes/{episode_id}/validation/ directory exists</action>
+      <action>Write ssd-validation-report.yaml</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT SCHEMA                                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output_schema>
+    <![CDATA[
+# ssd-validation-report.yaml
+
+episode_id: "{episode_id}"
+ssd_path: "episodes/{episode_id}/ssd/scene-spec.yaml"
+validated_at: "{ISO-8601 timestamp}"
+
+summary:
+  overall_status: "{PASS|FAIL}"
+  total_checks: {int}
+  passed: {int}
+  warnings: {int}
+  failed: {int}
+
+checks:
+  - rule_id: "{rule_id}"
+    name: "{rule name}"
+    severity: "{error|warning}"
+    status: "{pass|warn|fail}"
+    details: "{description of issue if failed, null if passed}"
+    affected_scenes: ["{scene_id}", ...]
+
+recommendations:
+  - "{actionable recommendation for each failure}"
+    ]]>
+  </output_schema>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ERROR HANDLING                                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <error_handling>
+    <error condition="SSD file not found">
+      <action>HALT: "Scene specification not found at episodes/{episode_id}/ssd/scene-spec.yaml"</action>
+    </error>
+    <error condition="SSD YAML parse error">
+      <action>HALT: "Failed to parse SSD YAML: {parse_error_details}"</action>
+    </error>
+    <error condition="Characters directory not found">
+      <action>WARN: "characters/ directory not found -- character reference validation skipped."</action>
+    </error>
+    <error condition="Environments directory not found">
+      <action>WARN: "characters/environments/ directory not found -- environment reference validation skipped."</action>
+    </error>
+  </error_handling>
+
+</task>

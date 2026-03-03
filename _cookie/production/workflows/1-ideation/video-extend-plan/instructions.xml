@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>video-extend-plan</workflow>
+    <description>Plan modifications for existing video content including extensions, replacements, overlays, format changes, and narration</description>
+    <agent>screenwriter</agent>
+  </meta>
+
+  <modification_types>
+    <type id="extend_duration">Add new scenes before, after, or between existing scenes to lengthen the video</type>
+    <type id="replace_section">Regenerate specific scenes with different content while preserving surrounding context</type>
+    <type id="add_overlay">Add text, captions, lower thirds, or watermarks to existing video without re-rendering base footage</type>
+    <type id="change_format">Adapt existing video to a different aspect ratio (e.g., 16:9 to 9:16, 1:1) with reframing</type>
+    <type id="add_narration">Add voice-over narration to an existing silent or music-only video</type>
+  </modification_types>
+
+  <steps>
+    <step id="1" name="receive_existing_video">
+      <action>Receive the existing video content to be modified. Load the video file and its associated SSD if available. Use ffprobe to identify the video's current duration, resolution, aspect ratio, codec, frame rate, and audio tracks. Note the episode ID and current scene count.</action>
+      <output>Existing video metadata and SSD reference</output>
+    </step>
+
+    <step id="2" name="analyze_existing_content">
+      <action>Analyze the existing video for: total duration, content structure and topic flow, visual style (color grading, lighting, camera patterns), characters present and their appearances, pacing and rhythm, music/audio style, and the final scene's visual state. Extract keyframes every 2 seconds for visual reference. Extract key style parameters to ensure continuity.</action>
+      <output>Content analysis report with style parameters and extracted keyframes</output>
+    </step>
+
+    <step id="3" name="classify_modification_type">
+      <action>Based on the user's request, classify the modification into one of five types:
+        1. EXTEND_DURATION — User wants to add new scenes (before, after, or between existing scenes) to lengthen the video. Keywords: extend, add scenes, continue, make longer, append, prepend.
+        2. REPLACE_SECTION — User wants to regenerate specific scenes with different content. Keywords: replace, redo, change scene, swap, update section, reshoot.
+        3. ADD_OVERLAY — User wants text, captions, lower thirds, or watermarks added to existing footage. Keywords: add text, subtitles, captions, lower third, title card, watermark, overlay.
+        4. CHANGE_FORMAT — User wants the video adapted to a different aspect ratio or format. Keywords: vertical, horizontal, square, reformat, resize, aspect ratio, 9:16, 1:1, portrait, landscape.
+        5. ADD_NARRATION — User wants voice-over narration added to an existing silent or music-only video. Keywords: narration, voice-over, voiceover, narrator, spoken, commentary, explain.
+
+        If the request spans multiple types, identify the primary type and list secondary types as follow-up tasks. Proceed to the appropriate planning step based on the classified type.</action>
+      <output>Classified modification type with confidence assessment and any secondary types identified</output>
+    </step>
+
+    <step id="4" name="plan_modification">
+      <action>Plan the modification based on the classified type:
+
+        FOR EXTEND_DURATION:
+          Plan new scenes that continue the existing content. Define: scene IDs (continuing from last existing scene), durations, scene types, visual directions that match existing style, audio directions that maintain tone, and narrative continuation. Ensure the first extension scene flows naturally from the last existing scene. Specify insertion point (before, after, or between existing scenes).
+
+        FOR REPLACE_SECTION:
+          Identify the exact scenes to be replaced by timestamp range or scene ID. Document what the current scenes contain and why they need replacement. Plan replacement scenes that: maintain the same duration (unless user specifies otherwise), preserve visual style continuity with surrounding scenes, handle transition frames at both boundaries (extract last frame of preceding scene and first frame of following scene), and maintain narrative coherence. Generate new scene specifications with updated visual/audio directions.
+
+        FOR ADD_OVERLAY:
+          Catalog all overlays to be added with precise timing. For each overlay define: type (text, caption, lower-third, watermark, title-card), content/text, position on screen (using safe-area coordinates), font/style specifications, animation (fade-in/out, slide, pop), start time and duration, and layer order if multiple overlays overlap. Plan ffmpeg drawtext or overlay filter chains. No re-rendering of base video needed.
+
+        FOR CHANGE_FORMAT:
+          Document source format (current aspect ratio, resolution) and target format. Plan the reframing strategy: crop-and-scale (center crop, rule-of-thirds crop, or subject-tracking crop), pillarbox/letterbox (add bars), or smart reframe (per-scene crop points based on subject position). For each scene, define the crop region or reframe parameters. Identify scenes where important content may be lost and flag for manual review. Plan output encoding parameters for the target format.
+
+        FOR ADD_NARRATION:
+          Analyze the video's existing audio tracks (music, SFX, silence). Plan the narration timeline: for each segment define narration text, start time, duration, and speaking pace. Specify voice parameters (voice ID, tone, speed) compatible with the project's TTS configuration. Plan audio mixing: narration level, background music ducking levels, fade transitions. If the video has existing music, plan ducking points where music volume reduces under narration. Define output audio mix strategy (stereo, separate tracks).</action>
+      <output>Detailed modification plan specific to the classified type</output>
+    </step>
+
+    <step id="5" name="generate_ssd_entries">
+      <action>Generate or update SSD entries based on the modification type:
+
+        FOR EXTEND_DURATION:
+          Generate complete SSD entries for each new extension scene following the scene-spec schema. Include VEO configuration, audio configuration, Remotion configuration, and cost estimates. Set appropriate input modes (image-to-video for the first extension clip using the extracted last frame of the preceding scene).
+
+        FOR REPLACE_SECTION:
+          Generate replacement SSD entries for each scene being replaced. Mark original scene entries as replaced (status: replaced, replaced_by: new_scene_id). Include boundary frame references for continuity. Set input modes to image-to-video where boundary continuity is needed.
+
+        FOR ADD_OVERLAY:
+          Generate overlay specification entries as an extension to the existing SSD. Use an overlays block with timing, position, style, and content for each overlay element. No new scene entries needed since the base video is unchanged. Include ffmpeg filter specifications.
+
+        FOR CHANGE_FORMAT:
+          Generate format-adapted SSD entries that mirror existing scenes but with updated resolution, aspect ratio, and crop/reframe parameters. Add a format_adaptation block to each scene entry specifying crop coordinates or reframe strategy. Include re-encoding cost estimates.
+
+        FOR ADD_NARRATION:
+          Generate narration entries as an extension to the existing SSD. Include a narration block with: segments (text, timing, voice config), mixing parameters (narration level, music duck level, fade durations), and TTS generation specifications. Link narration segments to scene IDs for synchronization.</action>
+      <output>Complete SSD entries or updates for the planned modification</output>
+    </step>
+
+    <step id="6" name="ensure_continuity">
+      <action>Verify continuity based on the modification type:
+
+        FOR EXTEND_DURATION:
+          Plan first-frame continuity by extracting the last frame(s) of the existing video using ffmpeg. Define how the first extension clip will use this frame as input (image-to-video mode). Verify style tokens match existing content. Check that character appearances are consistent with their last appearance in the existing video.
+
+        FOR REPLACE_SECTION:
+          Extract boundary frames: last frame of the scene before the replacement section, and first frame of the scene after the replacement section. Plan how replacement scenes will match these boundary frames. Verify that the replacement maintains consistent: visual style, character appearances, lighting conditions, camera angle patterns, and audio tone.
+
+        FOR ADD_OVERLAY:
+          Verify overlays do not obscure critical visual content (faces, important objects, existing text). Check that overlay timing does not conflict with scene transitions. Ensure text is readable at the video's resolution. Verify safe-area compliance for broadcast/platform requirements.
+
+        FOR CHANGE_FORMAT:
+          Verify that no critical visual content is lost in the reframe/crop. Check that text elements remain readable in the new format. Verify that character faces remain visible in all reformatted scenes. Test that the reframe strategy handles camera movements correctly (pan, zoom scenes may need per-frame crop adjustment).
+
+        FOR ADD_NARRATION:
+          Verify narration timing does not overlap with existing dialogue or important sound effects. Check that narration pacing matches visual content (not too fast or slow for what is on screen). Verify that audio ducking points align with narration start/end times. Ensure total narration length fits within video duration.</action>
+      <output>Continuity verification report with any flagged issues</output>
+    </step>
+
+    <step id="7" name="output_modification_plan">
+      <action>Compile the complete modification plan document including:
+        - Modification type classification and rationale
+        - Analysis summary of existing content
+        - Detailed modification specifications (type-specific)
+        - SSD entries or updates
+        - Continuity verification results and any flagged issues
+        - Cost estimate for the modification
+        - Execution strategy:
+            EXTEND_DURATION: merge strategy (ffmpeg concat for appending clips)
+            REPLACE_SECTION: splice strategy (ffmpeg segment replacement with re-encoding at boundaries)
+            ADD_OVERLAY: filter chain strategy (ffmpeg drawtext/overlay filters)
+            CHANGE_FORMAT: reframe and re-encode strategy (ffmpeg scale/crop/pad pipeline)
+            ADD_NARRATION: audio mix strategy (ffmpeg audio mixing with ducking)
+        - Any secondary modification types identified for follow-up
+
+        Save the modification plan alongside the existing SSD.</action>
+      <output>Complete modification plan document with SSD updates and execution strategy</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Modification type is correctly classified with clear rationale</gate>
+    <gate>Modification plan maintains visual style continuity with existing content</gate>
+    <gate>All new or updated scenes have complete and valid SSD entries</gate>
+    <gate>Continuity is verified at all modification boundaries</gate>
+    <gate>Character appearances are consistent between existing and modified content</gate>
+    <gate>Cost estimate is included for all modification work</gate>
+    <gate>Execution strategy is defined with specific ffmpeg commands or pipeline steps</gate>
+    <gate>No critical visual content is lost or obscured by the modification</gate>
+    <gate>Audio continuity is maintained (levels, style, mixing)</gate>
+  </quality-gates>
+</instructions>

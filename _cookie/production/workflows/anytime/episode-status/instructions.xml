@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>episode-status</workflow>
+    <description>Display comprehensive episode production status and project overview</description>
+    <agent>director</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_episode_config">
+      <action>Load the episode-config.yaml for the current episode from episodes/{episode_id}/episode-config.yaml. Extract the production_state block which contains boolean flags for each workflow completion checkpoint. Extract the episode status field (not-started, planning, pre-production, in-production, post-production, complete).</action>
+      <output>Episode configuration and production state loaded</output>
+    </step>
+
+    <step id="2" name="load_asset_inventory">
+      <action>Scan the episode's assets directory (episodes/{episode_id}/assets/) to count generated assets. Count: video clips generated vs total scenes in SSD, narration files generated vs scenes requiring narration, screen recordings generated vs screen-recording type scenes. Check the SSD for total scene count.</action>
+      <output>Asset inventory with completion counts</output>
+    </step>
+
+    <step id="3" name="load_cost_summary">
+      <action>Load the cost estimate from _cost/estimates/{episode_id}-estimate.yaml and actuals from _cost/actuals/{episode_id}-actuals.yaml. Calculate current spend, estimated total, and percentage used. If files do not exist, note that cost data is not yet available.</action>
+      <output>Cost summary for the episode</output>
+    </step>
+
+    <step id="4" name="display_episode_status">
+      <action>Display a comprehensive status report for the current episode. Include: Episode header (ID, title), Overall status (derived from production_state), Progress checklist with status icons for each production step (script finalized, characters created, style guide created, SSD created and validated, cost approved, assets generated with count, asset QA passed, composition assembled, preview approved, final rendered, exports complete, final QA passed), Asset summary (scenes generated/total, narrations generated/total), and Cost summary (spent/estimated with percentage). Use status icons: completed checkmark for true, in-progress indicator for the current step, empty indicator for false.</action>
+      <output>Formatted episode status displayed to user</output>
+    </step>
+
+    <step id="5" name="display_project_overview">
+      <action>If project-config.yaml exists and contains multiple episodes, display a project-level overview. List all registered episodes with: episode_id, title, status, and cost (actual or estimated). Show project budget: total spent across all episodes, total budget, utilization percentage. This gives the user a bird's eye view of the entire series.</action>
+      <output>Project-level overview displayed (if applicable)</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Episode production state loaded from episode-config.yaml</gate>
+    <gate>Asset inventory counted accurately against SSD</gate>
+    <gate>Cost summary calculated from estimate and actuals</gate>
+    <gate>Status report displayed with clear progress indicators</gate>
+    <gate>Project overview displayed if multi-episode project exists</gate>
+  </quality-gates>
+</instructions>

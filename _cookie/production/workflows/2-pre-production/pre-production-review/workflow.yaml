@@ -1,0 +1,46 @@
+name: pre-production-review
+workflow_id: pre-production-review
+module: production
+agent: storyboard-artist
+slash_command: /production-pre-production-review
+description: "Final pre-production review gate before asset generation"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/2-pre-production/pre-production-review"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/prompt-engineering.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "ssd_valid == true"
+    - check: "characters_valid == true"
+    - check: "cost_within_budget == true"
+    - check: "narrative_flow_approved == true"
+    - check: "all_prerequisites_complete == true"
+    - check: "review_decision_recorded == true"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"
+  style_guide:
+    path: "{project-root}/episodes/{episode_id}/style/style-guide.yaml"
+    load_strategy: "FULL_LOAD"
+  dependency_graph:
+    path: "{project-root}/episodes/{episode_id}/planning/dependency-graph.yaml"
+    load_strategy: "FULL_LOAD"
+  prompt_library:
+    path: "{project-root}/episodes/{episode_id}/prompts/prompt-library.yaml"
+    load_strategy: "FULL_LOAD"
+  budget:
+    path: "{project-root}/_cookie/_config/budget-limits.yaml"
+    load_strategy: "FULL_LOAD"

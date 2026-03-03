@@ -1,0 +1,33 @@
+name: subtitle-generation
+workflow_id: subtitle-generation
+module: production
+agent: editor
+slash_command: /production-subtitle-generation
+description: "Generate subtitle files (SRT, VTT) from narration text and optionally burn them into the video"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/5-post-production/subtitle-generation"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/ffmpeg/SKILL.md"
+
+input_file_patterns:
+  rendered_video:
+    path: "{project-root}/episodes/{episode_id}/exports/"
+    load_strategy: "INDEX_GUIDED"
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "narration_text_extracted == true"
+    - check: "srt_generated == true"
+    - check: "vtt_generated == true"
+    - check: "timing_accurate == true"
+    - check: "burn_in_applied_if_requested == true"

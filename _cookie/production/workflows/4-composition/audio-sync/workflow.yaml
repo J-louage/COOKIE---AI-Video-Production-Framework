@@ -1,0 +1,37 @@
+name: audio-sync
+workflow_id: audio-sync
+module: production
+agent: motion-designer
+slash_command: /production-audio-sync
+description: "Synchronize narration, music, and SFX audio tracks with precise timing and level management"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/4-composition/audio-sync"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/remotion/SKILL.md"
+  - "{project-root}/_cookie/skills/shared/audio-mixing.md"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  audio_assets:
+    path: "{project-root}/episodes/{episode_id}/assets/audio/"
+    load_strategy: "INDEX_GUIDED"
+  video_assets:
+    path: "{project-root}/episodes/{episode_id}/assets/video/"
+    load_strategy: "INDEX_GUIDED"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "narration_mapped_to_frames == true"
+    - check: "music_ducking_applied == true"
+    - check: "sfx_placed_at_timestamps == true"
+    - check: "audio_mix_built == true"
+    - check: "levels_validated_lufs == true"

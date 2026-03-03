@@ -1,0 +1,41 @@
+command,description,agent,phase
+cookie-screenwriter,Activate Screenwriter (Nora),screenwriter,production
+cookie-storyboard,Activate Storyboard Artist (Luca),storyboard-artist,production
+cookie-character,Activate Character Designer (Iris),character-designer,production
+cookie-prompt-engineer,Activate Prompt Engineer (Zara),prompt-engineer,production
+cookie-cinematographer,Activate Cinematographer (Orion),cinematographer,production
+cookie-voice,Activate Voice Director (Celeste),voice-director,production
+cookie-demo,Activate Demo Producer (Kai),demo-producer,production
+cookie-sound,Activate Sound Designer (Reed),sound-designer,production
+cookie-idea,Transform concept into canonical script,screenwriter,1-ideation
+cookie-validate-script,Validate and normalize user-provided script,screenwriter,1-ideation
+cookie-audio-to-script,Transcribe audio and build visual script,screenwriter,1-ideation
+cookie-extend-plan,Plan video extension/modification,screenwriter,1-ideation
+cookie-script-review,Creative review of finalized script,creative-director + screenwriter,1-ideation
+cookie-create-character,Create character identity and reference images,character-designer,2-pre-production
+cookie-create-style,Define visual style guide,character-designer + creative-director,2-pre-production
+cookie-create-ssd,Generate Scene Specification Document from script,storyboard-artist,2-pre-production
+cookie-dependency-graph,Build asset dependency graph,storyboard-artist,2-pre-production
+cookie-prompt-library,Generate all prompts with consistency validation,prompt-engineer,2-pre-production
+cookie-pre-prod-review,Review SSD and approve cost estimate,director + producer,2-pre-production
+cookie-gen-char-refs,Generate multi-angle character reference images,character-designer,3-asset-generation
+cookie-gen-frames,Generate first/last frames for scene continuity,cinematographer,3-asset-generation
+cookie-gen-video,Generate video clips via VEO,cinematographer,3-asset-generation
+cookie-gen-narration,Generate narration via ElevenLabs,voice-director,3-asset-generation
+cookie-record-screen,Capture screen recordings via Playwright,demo-producer,3-asset-generation
+cookie-gen-audio,Generate music and sound effects,sound-designer,3-asset-generation
+cookie-asset-qa,Validate generated assets against SSD,prompt-engineer + editor,3-asset-generation
+cookie-remotion-assembly,Assemble assets into Remotion composition,motion-designer,4-composition
+cookie-audio-sync,Synchronize audio with video timeline,sound-designer + motion-designer,4-composition
+cookie-text-animation,Add text overlays and captions,motion-designer,4-composition
+cookie-preview,Render low-res preview for review,editor,4-composition
+cookie-final-render,Render full-resolution primary format,editor,5-post-production
+cookie-multi-export,Generate all export formats,editor,5-post-production
+cookie-subtitles,Generate and burn-in subtitles,editor,5-post-production
+cookie-thumbnails,Generate thumbnail images per format,storyboard-artist,5-post-production
+cookie-final-qa,Final quality checklist before delivery,editor,5-post-production
+cookie-regen-scene,Regenerate specific scenes with revised prompts,cinematographer + prompt-engineer,anytime
+cookie-cost-status,Show current cost status vs estimate,producer,anytime
+cookie-episode-status,Show episode production status,director,anytime
+cookie-quick-video,Rapid single-video production,multi-agent,quick-flow
+cookie-quick-social,Rapid social media clip generation,multi-agent,quick-flow

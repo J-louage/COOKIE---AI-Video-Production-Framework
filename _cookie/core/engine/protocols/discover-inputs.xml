@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Framework — Protocol: Discover Inputs
+  Smart file discovery and loading for workflow steps.
+
+  This protocol governs how the workflow engine locates, resolves,
+  and loads input files required by each step in a workflow.
+  It supports three loading strategies and handles path resolution,
+  reference expansion, and missing-file error recovery.
+-->
+<protocol id="discover-inputs" version="1.0">
+
+  <metadata>
+    <name>Discover Inputs</name>
+    <description>
+      Smart file discovery protocol with multiple loading strategies.
+      Resolves file references, expands path patterns, and loads content
+      into the workflow context for downstream step consumption.
+    </description>
+    <triggers>
+      <trigger>Before each workflow step that declares `inputs`</trigger>
+      <trigger>When a step references files via `ref:` prefix</trigger>
+      <trigger>When a dependency-resolve plan lists required assets</trigger>
+    </triggers>
+  </metadata>
+
+  <!-- ================================================================
+       SECTION 1: LOADING STRATEGIES
+       ================================================================ -->
+  <strategies>
+
+    <!--
+      FULL_LOAD — Read entire file into context.
+      Use for small-to-medium files where the whole content is needed.
+      Examples: character identity JSON, episode outline, config YAML.
+    -->
+    <strategy id="FULL_LOAD">
+      <description>
+        Read the entire file contents into the workflow context as a single
+        block. The file is stored under its resolved key in the context map.
+      </description>
+      <constraints>
+        <max_file_size unit="KB">512</max_file_size>
+        <supported_formats>json, yaml, yml, md, txt, xml</supported_formats>
+      </constraints>
+      <procedure>
+        <step order="1">Resolve the file path (see path-resolution below).</step>
+        <step order="2">Verify the file exists on disk.</step>
+        <step order="3">Check file size against max_file_size constraint.</step>
+        <step order="4">
+          If file exceeds max_file_size, automatically escalate to SELECTIVE_LOAD
+          strategy and log a warning.
+        </step>
+        <step order="5">Read the entire file content.</step>
+        <step order="6">Parse the content according to its format (JSON, YAML, etc.).</step>
+        <step order="7">
+          Store the parsed content in the workflow context under the key
+          derived from the input declaration (e.g., `context.inputs.{input_name}`).
+        </step>
+      </procedure>
+    </strategy>
+
+    <!--
+      SELECTIVE_LOAD — Load specific sections or keys only.
+      Use for large files where only certain parts are needed.
+      Examples: loading only a specific character's dialogue from a script,
+      pulling a single scene definition from a multi-scene SSD.
+    -->
+    <strategy id="SELECTIVE_LOAD">
+      <description>
+        Load only the specified sections, keys, or line ranges from a file.
+        Reduces context consumption for large files where only a subset
+        of the data is relevant to the current step.
+      </description>
+      <constraints>
+        <requires>selector expression in input declaration</requires>
+        <supported_selectors>
+          <selector type="json_path">$.characters[0].name</selector>
+          <selector type="yaml_key">scenes.scene_03.description</selector>
+          <selector type="line_range">42-87</selector>
+          <selector type="heading">## Act Two</selector>
+        </supported_selectors>
+      </constraints>
+      <procedure>
+        <step order="1">Resolve the file path.</step>
+        <step order="2">Verify the file exists on disk.</step>
+        <step order="3">Parse the selector expression from the input declaration.</step>
+        <step order="4">
+          Read the file and extract only the matching sections:
+          - For json_path: evaluate the JSONPath expression against parsed JSON.
+          - For yaml_key: traverse the YAML structure to the specified key.
+          - For line_range: read only the specified line numbers.
+          - For heading: extract the markdown section under the given heading
+            (up to the next heading of equal or higher level).
+        </step>
+        <step order="5">
+          Store the extracted content in the workflow context.
+          Include metadata about which sections were loaded for traceability.
+        </step>
+      </procedure>
+    </strategy>
+
+    <!--
+      INDEX_GUIDED — Read a directory index, then load specific files.
+      Use for directory-based assets where a manifest or index file
+      describes what is available and the step picks what it needs.
+      Examples: character reference sheets directory, asset library.
+    -->
+    <strategy id="INDEX_GUIDED">
+      <description>
+        First read a directory index or manifest file, then selectively
+        load individual files based on what the index reveals. This is
+        a two-phase discovery process for directory-structured assets.
+      </description>
+      <constraints>
+        <requires>directory path with an index file</requires>
+        <index_file_names>
+          <name>index.yaml</name>
+          <name>index.json</name>
+          <name>manifest.yaml</name>
+          <name>manifest.json</name>
+          <name>_index.yaml</name>
+        </index_file_names>
+      </constraints>
+      <procedure>
+        <step order="1">Resolve the directory path.</step>
+        <step order="2">Verify the directory exists on disk.</step>
+        <step order="3">
+          Locate the index file by checking index_file_names in order.
+          Use the first one found. If none found, fall back to a directory
+          listing and construct a virtual index from filenames.
+        </step>
+        <step order="4">Parse the index file to get the catalogue of available assets.</step>
+        <step order="5">
+          Match the step's input requirements against the index entries.
+          Determine which specific files need to be loaded.
+        </step>
+        <step order="6">
+          Load each matched file using FULL_LOAD or SELECTIVE_LOAD
+          depending on the file size and the step's selector requirements.
+        </step>
+        <step order="7">
+          Store all loaded assets in the workflow context as a collection,
+          preserving the index structure for downstream reference.
+        </step>
+      </procedure>
+    </strategy>
+
+  </strategies>
+
+  <!-- ================================================================
+       SECTION 2: PATH RESOLUTION
+       ================================================================ -->
+  <path_resolution>
+    <description>
+      All file paths in workflow inputs go through path resolution before
+      any loading strategy is applied. Resolution handles three cases:
+      ref-prefixed paths, pattern-based paths, and literal paths.
+    </description>
+
+    <!--
+      ref: prefixed paths resolve relative to the project root.
+      Example: ref:characters/marcus/identity.json
+        → {project-root}/characters/marcus/identity.json
+    -->
+    <resolver id="ref_prefix">
+      <pattern>^ref:(.+)$</pattern>
+      <description>
+        Paths prefixed with `ref:` are project-relative references.
+        Strip the `ref:` prefix and prepend the project root path.
+      </description>
+      <procedure>
+        <step order="1">Detect the `ref:` prefix in the path string.</step>
+        <step order="2">Strip the prefix, leaving the relative path portion.</step>
+        <step order="3">
+          Resolve `{project-root}` from the workflow context. This is set
+          during workflow initialization from the COOKIE project configuration.
+        </step>
+        <step order="4">
+          Join: `{project-root}` + `/` + relative_path.
+          Normalize the resulting path (resolve `..`, remove double slashes).
+        </step>
+        <step order="5">Return the absolute path.</step>
+      </procedure>
+      <examples>
+        <example>
+          <input>ref:characters/marcus/identity.json</input>
+          <context>project-root = /Users/creator/projects/my-series</context>
+          <output>/Users/creator/projects/my-series/characters/marcus/identity.json</output>
+        </example>
+        <example>
+          <input>ref:_cookie/_config/pricing.yaml</input>
+          <context>project-root = /Users/creator/projects/my-series</context>
+          <output>/Users/creator/projects/my-series/_cookie/_config/pricing.yaml</output>
+        </example>
+      </examples>
+    </resolver>
+
+    <!--
+      Pattern-based paths contain {variable} placeholders that must be
+      resolved from the workflow context before the path can be used.
+    -->
+    <resolver id="pattern_variables">
+      <pattern>\{[a-zA-Z_][a-zA-Z0-9_\-]*\}</pattern>
+      <description>
+        Paths containing `{variable}` placeholders are resolved by
+        substituting each placeholder with its value from the workflow
+        context. All placeholders must resolve or the path is invalid.
+      </description>
+      <known_variables>
+        <variable name="project-root">Absolute path to the COOKIE project root directory.</variable>
+        <variable name="episode_path">Absolute path to the current episode directory.</variable>
+        <variable name="episode_id">Identifier for the current episode (e.g., ep01, ep02).</variable>
+        <variable name="scene_id">Identifier for the current scene within an episode.</variable>
+        <variable name="character_id">Identifier for the current character being processed.</variable>
+        <variable name="workflow_id">Unique ID of the running workflow instance.</variable>
+        <variable name="ssd_path">Path to the current episode's SSD directory.</variable>
+      </known_variables>
+      <procedure>
+        <step order="1">Scan the path string for all `{variable}` patterns.</step>
+        <step order="2">
+          For each placeholder found:
+          a) Look up the variable name in the workflow context.
+          b) If found, substitute the placeholder with the resolved value.
+          c) If NOT found, trigger `on_error.unresolved_variable` and halt.
+        </step>
+        <step order="3">
+          After all substitutions, normalize the path.
+          Apply ref_prefix resolution if the result starts with `ref:`.
+        </step>
+        <step order="4">Return the fully resolved absolute path.</step>
+      </procedure>
+      <examples>
+        <example>
+          <input>{episode_path}/ssd/scene-{scene_id}.yaml</input>
+          <context>
+            episode_path = /projects/my-series/episodes/ep01
+            scene_id = 03
+          </context>
+          <output>/projects/my-series/episodes/ep01/ssd/scene-03.yaml</output>
+        </example>
+      </examples>
+    </resolver>
+
+    <!--
+      Literal paths are absolute paths with no prefixes or placeholders.
+      They are used as-is after normalization.
+    -->
+    <resolver id="literal">
+      <pattern>^/.*$</pattern>
+      <description>
+        Absolute paths without `ref:` prefix or `{variable}` placeholders.
+        Used as-is after path normalization.
+      </description>
+      <procedure>
+        <step order="1">Verify the path is absolute (starts with `/`).</step>
+        <step order="2">Normalize the path (resolve `..`, remove double slashes).</step>
+        <step order="3">Return the normalized absolute path.</step>
+      </procedure>
+    </resolver>
+
+  </path_resolution>
+
+  <!-- ================================================================
+       SECTION 3: STRATEGY SELECTION LOGIC
+       ================================================================ -->
+  <strategy_selection>
+    <description>
+      When an input declaration does not explicitly specify a loading strategy,
+      the engine auto-selects the best strategy based on the input characteristics.
+    </description>
+    <rules>
+      <rule priority="1">
+        <condition>Input declaration includes a `selector` field.</condition>
+        <action>Use SELECTIVE_LOAD strategy.</action>
+      </rule>
+      <rule priority="2">
+        <condition>Input path resolves to a directory (not a file).</condition>
+        <action>Use INDEX_GUIDED strategy.</action>
+      </rule>
+      <rule priority="3">
+        <condition>Input path resolves to a single file ≤ 512KB.</condition>
+        <action>Use FULL_LOAD strategy.</action>
+      </rule>
+      <rule priority="4">
+        <condition>Input path resolves to a single file > 512KB.</condition>
+        <action>Use SELECTIVE_LOAD strategy with auto-generated selectors based on step requirements.</action>
+      </rule>
+      <rule priority="5">
+        <condition>No strategy can be determined.</condition>
+        <action>Log a warning. Attempt FULL_LOAD as fallback. If it fails, trigger on_error.validation_failure.</action>
+      </rule>
+    </rules>
+  </strategy_selection>
+
+  <!-- ================================================================
+       SECTION 4: MISSING FILE DETECTION AND ERROR HANDLING
+       ================================================================ -->
+  <error_handling>
+    <description>
+      When a resolved path does not point to an existing file or directory,
+      the protocol triggers the appropriate error handler from error-recovery.xml.
+    </description>
+
+    <on_error type="missing_file">
+      <description>
+        Triggered when a resolved file path does not exist on disk.
+      </description>
+      <procedure>
+        <step order="1">
+          Log the missing file path and the input declaration that referenced it.
+        </step>
+        <step order="2">
+          Check if the input is marked as `optional: true` in the workflow step.
+          If optional, log a warning and continue with a null value in context.
+        </step>
+        <step order="3">
+          If the input is required, delegate to the `missing_file` handler
+          defined in error-recovery.xml:
+          - Present the missing path to the user.
+          - Ask for the correct path or permission to skip.
+          - If user provides a new path, re-run path resolution and validation.
+          - If user chooses to skip, mark the input as skipped in context
+            and let the step decide how to handle the missing data.
+        </step>
+      </procedure>
+    </on_error>
+
+    <on_error type="unresolved_variable">
+      <description>
+        Triggered when a `{variable}` placeholder cannot be resolved
+        from the workflow context during path resolution.
+      </description>
+      <procedure>
+        <step order="1">
+          Immediately halt path resolution for this input.
+        </step>
+        <step order="2">
+          Delegate to the `unresolved_variable` handler in error-recovery.xml.
+          The workflow will halt with a clear error message listing:
+          - The unresolved variable name.
+          - The full path pattern that contains it.
+          - The workflow step that declared the input.
+          - Suggestions for where the variable should have been set.
+        </step>
+      </procedure>
+    </on_error>
+
+  </error_handling>
+
+  <!-- ================================================================
+       SECTION 5: CONTEXT OUTPUT FORMAT
+       ================================================================ -->
+  <context_output>
+    <description>
+      After discovery and loading, all resolved inputs are stored in the
+      workflow context under a structured namespace for the current step.
+    </description>
+    <format>
+      <entry key="context.steps.{step_id}.inputs.{input_name}">
+        <field name="value">The loaded content (parsed object, string, or collection).</field>
+        <field name="source_path">The fully resolved absolute path to the source file.</field>
+        <field name="strategy">The loading strategy that was used (FULL_LOAD, SELECTIVE_LOAD, INDEX_GUIDED).</field>
+        <field name="selector">The selector expression used, if any (null for FULL_LOAD).</field>
+        <field name="loaded_at">ISO 8601 timestamp of when the content was loaded.</field>
+        <field name="file_size_bytes">Size of the source file in bytes.</field>
+        <field name="checksum">SHA-256 hash of the loaded content for cache validation.</field>
+      </entry>
+    </format>
+  </context_output>
+
+</protocol>

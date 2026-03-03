@@ -1,0 +1,46 @@
+name: asset-qa
+workflow_id: asset-qa
+module: production
+agent: prompt-engineer
+slash_command: /production-asset-qa
+description: "Quality assurance validation of all generated assets"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/3-asset-generation/asset-qa"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/prompt-engineering.md"
+  - "{project-root}/_cookie/skills/ffmpeg/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "all_assets_present_per_ssd == true"
+    - check: "video_quality_acceptable == true"
+    - check: "audio_clean == true"
+    - check: "character_consistency_maintained == true"
+    - check: "qa_report_generated == true"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  video_assets:
+    path: "{project-root}/episodes/{episode_id}/assets/video/"
+    load_strategy: "INDEX_GUIDED"
+  audio_assets:
+    path: "{project-root}/episodes/{episode_id}/assets/audio/"
+    load_strategy: "INDEX_GUIDED"
+  frame_assets:
+    path: "{project-root}/episodes/{episode_id}/assets/frames/"
+    load_strategy: "INDEX_GUIDED"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"
+  qa_checklist:
+    path: "{project-root}/_cookie/production/templates/asset-qa-checklist.md"
+    load_strategy: "FULL_LOAD"

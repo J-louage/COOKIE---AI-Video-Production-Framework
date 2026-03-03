@@ -1,0 +1,51 @@
+# YouTube 1080p Encoding Preset
+# Full HD upload optimized for YouTube's re-encoding pipeline.
+# Uses H.264 High Profile with slow preset for best quality-to-size ratio.
+# YouTube re-encodes all uploads, so providing high-quality source yields better results.
+
+preset_name: "youtube-1080p"
+platform: "YouTube"
+description: "YouTube Full HD upload — H.264 High Profile, slow preset for maximum quality retention after YouTube re-encoding"
+
+resolution:
+  width: 1920
+  height: 1080
+
+aspect_ratio: "16:9"
+frame_rate: 30
+
+codec_settings:
+  video_codec: "libx264"
+  pixel_format: "yuv420p"
+  crf: 23
+  preset: "slow"
+  profile: "high"
+  level: "4.1"
+
+audio_settings:
+  codec: "aac"
+  bitrate: "192k"
+  sample_rate: 48000
+  channels: 2
+
+constraints:
+  max_bitrate: "8M"
+  bufsize: "16M"
+  max_file_size: null
+  max_duration: null
+
+ffmpeg_command: >-
+  ffmpeg -i {input}
+  -c:v libx264 -pix_fmt yuv420p -crf 23 -preset slow
+  -profile:v high -level:v 4.1
+  -maxrate 8M -bufsize 16M
+  -c:a aac -b:a 192k -ar 48000 -ac 2
+  -movflags +faststart
+  {output}.mp4
+
+# Notes:
+# - movflags +faststart moves the moov atom to the beginning for faster streaming start
+# - CRF 23 is the libx264 default and provides a good balance of quality and file size
+# - Slow preset spends more time encoding for better compression efficiency
+# - maxrate/bufsize constrain peaks to prevent buffering issues on slower connections
+# - YouTube recommends uploading the highest quality source possible

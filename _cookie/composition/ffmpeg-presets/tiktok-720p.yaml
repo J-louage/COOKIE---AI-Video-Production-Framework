@@ -1,0 +1,64 @@
+# TikTok 720p Encoding Preset
+# Vertical 9:16 format optimized for mobile playback.
+# Uses 720x1280 resolution which TikTok handles well without heavy re-encoding.
+# Bitrate capped at 4M to stay within TikTok's processing sweet spot.
+
+preset_name: "tiktok-720p"
+platform: "TikTok"
+description: "TikTok vertical video — 9:16 portrait at 720p, optimized for mobile playback and fast upload processing"
+
+resolution:
+  width: 720
+  height: 1280
+
+aspect_ratio: "9:16"
+frame_rate: 30
+
+codec_settings:
+  video_codec: "libx264"
+  pixel_format: "yuv420p"
+  crf: 23
+  preset: "medium"
+  profile: "high"
+  level: "3.1"
+
+audio_settings:
+  codec: "aac"
+  bitrate: "128k"
+  sample_rate: 44100
+  channels: 2
+
+constraints:
+  max_bitrate: "4M"
+  bufsize: "8M"
+  max_file_size: null
+  max_duration: 600        # 10 minutes maximum
+
+ffmpeg_command: >-
+  ffmpeg -i {input}
+  -c:v libx264 -pix_fmt yuv420p -crf 23 -preset medium
+  -profile:v high -level:v 3.1
+  -maxrate 4M -bufsize 8M
+  -vf "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2"
+  -c:a aac -b:a 128k -ar 44100 -ac 2
+  -movflags +faststart
+  {output}.mp4
+
+# Crop from 16:9 source (center crop, no letterbox):
+ffmpeg_command_crop: >-
+  ffmpeg -i {input}
+  -c:v libx264 -pix_fmt yuv420p -crf 23 -preset medium
+  -profile:v high -level:v 3.1
+  -maxrate 4M -bufsize 8M
+  -vf "crop=ih*9/16:ih,scale=720:1280"
+  -c:a aac -b:a 128k -ar 44100 -ac 2
+  -movflags +faststart
+  {output}.mp4
+
+# Notes:
+# - 720p is preferred over 1080p for TikTok as it processes faster and looks sharp on mobile
+# - Medium preset balances encoding speed with quality (TikTok re-encodes heavily anyway)
+# - Level 3.1 ensures broad device compatibility including older Android phones
+# - maxrate 4M prevents bitrate spikes that could cause upload processing issues
+# - The scale+pad filter handles non-9:16 input by letterboxing; use crop variant to fill
+# - max_duration of 600s (10 min) reflects TikTok's current limit for most accounts

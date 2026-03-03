@@ -1,0 +1,562 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Framework — Protocol: Dependency Resolve
+  Asset dependency graph resolver for production pipelines.
+
+  This protocol parses the asset-dependency-graph.yaml from the episode's
+  SSD directory, determines which tasks can run in parallel versus
+  sequentially, and produces an ordered execution plan with parallel groups.
+-->
+<protocol id="dependency-resolve" version="1.0">
+
+  <metadata>
+    <name>Dependency Resolve</name>
+    <description>
+      Parses the asset dependency graph for an episode and resolves it into
+      an ordered execution plan. The plan identifies which production tasks
+      must run sequentially (because they depend on each other's outputs)
+      and which can run in parallel (because they are independent). This
+      maximizes throughput while respecting the dependency constraints of
+      the production pipeline.
+    </description>
+    <triggers>
+      <trigger>Before episode production begins (after SSD generation).</trigger>
+      <trigger>When the Director needs to plan the execution order for an episode.</trigger>
+      <trigger>When re-planning after a partial failure (re-resolve remaining tasks).</trigger>
+    </triggers>
+    <inputs>
+      <input>
+        <name>asset-dependency-graph.yaml</name>
+        <path>{episode_path}/ssd/asset-dependency-graph.yaml</path>
+        <description>
+          YAML file defining all assets required for the episode and their
+          dependency relationships. Generated during SSD creation.
+        </description>
+      </input>
+    </inputs>
+    <outputs>
+      <output>Ordered execution plan with parallel groups.</output>
+      <output>Estimated total duration based on critical path analysis.</output>
+    </outputs>
+  </metadata>
+
+  <!-- ================================================================
+       SECTION 1: DEPENDENCY GRAPH SCHEMA
+       ================================================================ -->
+  <graph_schema>
+    <description>
+      Expected structure of the asset-dependency-graph.yaml file.
+      Each node in the graph represents an asset or production task.
+      Edges represent "depends on" relationships.
+    </description>
+
+    <node_schema>
+      <field name="id" type="string" required="true">
+        Unique identifier for the asset/task (e.g., `char-marcus-ref`, `scene-03-video`).
+      </field>
+      <field name="type" type="enum" required="true">
+        <values>
+          <value>character-ref</value>
+          <value>first-frame</value>
+          <value>video-clip</value>
+          <value>narration</value>
+          <value>music</value>
+          <value>sfx</value>
+          <value>merge</value>
+          <value>quality-check</value>
+        </values>
+      </field>
+      <field name="description" type="string" required="false">
+        Human-readable description of what this asset/task produces.
+      </field>
+      <field name="depends_on" type="array" required="false">
+        List of node IDs that must complete before this node can execute.
+        Empty or absent means the node has no dependencies and can run
+        in the first parallel group.
+      </field>
+      <field name="estimated_duration_seconds" type="number" required="false">
+        Estimated wall-clock time for this task in seconds.
+        Used for critical path analysis and progress estimation.
+      </field>
+      <field name="tool" type="string" required="false">
+        The tool or skill used to produce this asset (e.g., `dall-e-3`, `runway-gen4`).
+      </field>
+      <field name="scene_id" type="string" required="false">
+        The scene this asset belongs to, if applicable.
+      </field>
+      <field name="retryable" type="boolean" required="false">
+        Whether this task can be retried on failure. Defaults to true.
+      </field>
+    </node_schema>
+
+    <example_graph><![CDATA[
+# asset-dependency-graph.yaml (example)
+
+assets:
+  # Character references — no dependencies, run first
+  - id: char-marcus-ref
+    type: character-ref
+    description: "Generate reference sheet for Marcus"
+    depends_on: []
+    estimated_duration_seconds: 30
+    tool: dall-e-3
+
+  - id: char-elena-ref
+    type: character-ref
+    description: "Generate reference sheet for Elena"
+    depends_on: []
+    estimated_duration_seconds: 30
+    tool: dall-e-3
+
+  # First frames — depend on character refs
+  - id: scene-01-frame
+    type: first-frame
+    description: "Generate first frame for scene 01"
+    depends_on: [char-marcus-ref, char-elena-ref]
+    estimated_duration_seconds: 20
+    tool: dall-e-3
+    scene_id: "01"
+
+  - id: scene-02-frame
+    type: first-frame
+    description: "Generate first frame for scene 02"
+    depends_on: [char-marcus-ref]
+    estimated_duration_seconds: 20
+    tool: dall-e-3
+    scene_id: "02"
+
+  # Video clips — depend on first frames
+  - id: scene-01-video
+    type: video-clip
+    description: "Generate video clip for scene 01"
+    depends_on: [scene-01-frame]
+    estimated_duration_seconds: 120
+    tool: runway-gen4
+    scene_id: "01"
+
+  - id: scene-02-video
+    type: video-clip
+    description: "Generate video clip for scene 02"
+    depends_on: [scene-02-frame]
+    estimated_duration_seconds: 120
+    tool: runway-gen4
+    scene_id: "02"
+
+  # Narration — independent, runs in parallel with video
+  - id: narration-full
+    type: narration
+    description: "Generate full episode narration"
+    depends_on: []
+    estimated_duration_seconds: 45
+    tool: elevenlabs
+
+  # Music — independent, runs in parallel with everything
+  - id: music-track
+    type: music
+    description: "Generate background music track"
+    depends_on: []
+    estimated_duration_seconds: 60
+    tool: suno
+
+  # SFX — independent, runs in parallel with everything
+  - id: sfx-pack
+    type: sfx
+    description: "Generate sound effects pack"
+    depends_on: []
+    estimated_duration_seconds: 30
+    tool: elevenlabs-sfx
+
+  # Final merge — depends on all video clips, narration, music, and sfx
+  - id: episode-merge
+    type: merge
+    description: "Merge all assets into final episode video"
+    depends_on: [scene-01-video, scene-02-video, narration-full, music-track, sfx-pack]
+    estimated_duration_seconds: 60
+    tool: ffmpeg
+]]></example_graph>
+  </graph_schema>
+
+  <!-- ================================================================
+       SECTION 2: RESOLUTION ALGORITHM
+       ================================================================ -->
+  <resolution_algorithm>
+    <description>
+      The dependency resolution algorithm uses topological sorting with
+      level grouping to produce parallel execution groups. It also
+      performs cycle detection to catch invalid dependency configurations.
+    </description>
+
+    <step order="1">
+      <name>Parse Dependency Graph</name>
+      <action>
+        Load the asset-dependency-graph.yaml file using the discover-inputs
+        protocol with FULL_LOAD strategy. Parse into an in-memory graph
+        structure with nodes and directed edges.
+      </action>
+    </step>
+
+    <step order="2">
+      <name>Validate Graph Integrity</name>
+      <action>
+        Perform validation checks on the parsed graph:
+        <checks>
+          <check name="no_dangling_references">
+            Every ID in a `depends_on` list must correspond to an existing
+            node in the graph. If a dependency references a non-existent
+            node, trigger `on_error.validation_failure`.
+          </check>
+          <check name="no_self_references">
+            No node may depend on itself. Self-references trigger
+            `on_error.validation_failure`.
+          </check>
+          <check name="no_cycles">
+            The graph must be a Directed Acyclic Graph (DAG). Use depth-first
+            search with coloring (white/gray/black) to detect cycles.
+            If a cycle is found, report the cycle path and trigger
+            `on_error.validation_failure`.
+          </check>
+          <check name="no_orphaned_nodes">
+            Every non-root node should eventually lead to a terminal node
+            (typically a merge node). Warn about orphaned nodes that are
+            not depended upon by anything and are not terminal.
+          </check>
+        </checks>
+      </action>
+    </step>
+
+    <step order="3">
+      <name>Compute In-Degree Map</name>
+      <action>
+        For each node, count the number of incoming edges (dependencies).
+        Nodes with in-degree 0 have no dependencies and form the first
+        parallel group.
+      </action>
+    </step>
+
+    <step order="4">
+      <name>Topological Sort with Level Grouping</name>
+      <action>
+        Using Kahn's algorithm with level tracking:
+        <sub_steps>
+          <sub_step order="a">
+            Initialize a queue with all nodes that have in-degree 0.
+            These form parallel_group_1.
+          </sub_step>
+          <sub_step order="b">
+            While the queue is not empty:
+            - Process all nodes in the current level as one parallel group.
+            - For each processed node, decrement the in-degree of all its
+              dependents (nodes that list this node in their depends_on).
+            - Collect all newly zero-in-degree nodes into the next level.
+            - Increment the level counter.
+          </sub_step>
+          <sub_step order="c">
+            If all nodes have been processed, the sort is complete.
+            If some nodes remain with non-zero in-degree, a cycle exists
+            (this should have been caught in step 2, but serves as a safety net).
+          </sub_step>
+        </sub_steps>
+      </action>
+    </step>
+
+    <step order="5">
+      <name>Apply Production Pipeline Rules</name>
+      <action>
+        Apply the COOKIE production pipeline ordering rules on top of
+        the topological sort to ensure correct asset production sequence:
+
+        <pipeline_rules>
+          <rule id="character_refs_first" priority="1">
+            <description>
+              Character reference sheets must be generated before any
+              first-frames that feature those characters. This is enforced
+              by explicit depends_on in the graph, but validated here as
+              a safety check.
+            </description>
+            <validation>
+              All `first-frame` nodes must have at least one `character-ref`
+              node in their transitive dependency set.
+            </validation>
+          </rule>
+
+          <rule id="first_frames_before_video" priority="2">
+            <description>
+              First frames must be generated before video clips for the
+              same scene. Video generation uses the first frame as the
+              starting image.
+            </description>
+            <validation>
+              Every `video-clip` node with a scene_id must depend on the
+              corresponding `first-frame` node with the same scene_id.
+            </validation>
+          </rule>
+
+          <rule id="video_before_merge" priority="3">
+            <description>
+              All video clips must be complete before the merge step.
+            </description>
+            <validation>
+              The `merge` node must depend on all `video-clip` nodes.
+            </validation>
+          </rule>
+
+          <rule id="narration_parallel_with_video" priority="4">
+            <description>
+              Narration generation is independent of the video pipeline.
+              It can run in parallel with first-frame and video-clip generation.
+              It only needs to be complete before the merge step.
+            </description>
+            <validation>
+              `narration` nodes should NOT depend on `first-frame` or
+              `video-clip` nodes. They should only be dependencies of
+              `merge` nodes.
+            </validation>
+          </rule>
+
+          <rule id="music_sfx_parallel" priority="5">
+            <description>
+              Music and sound effects generation is independent of all
+              other production tasks. They can run in parallel with
+              everything else and only need to be complete before merge.
+            </description>
+            <validation>
+              `music` and `sfx` nodes should have no dependencies
+              (in-degree 0). They should only be dependencies of
+              `merge` nodes.
+            </validation>
+          </rule>
+        </pipeline_rules>
+      </action>
+    </step>
+
+    <step order="6">
+      <name>Critical Path Analysis</name>
+      <action>
+        Identify the critical path (longest path through the DAG by
+        estimated duration) to determine:
+        - The minimum total execution time (assuming unlimited parallelism).
+        - Which tasks are on the critical path (any delay in these
+          delays the entire production).
+        - Which tasks have slack (can be delayed without affecting
+          total production time).
+      </action>
+    </step>
+
+    <step order="7">
+      <name>Generate Execution Plan</name>
+      <action>
+        Produce the final execution plan as a structured document
+        containing ordered parallel groups.
+      </action>
+    </step>
+  </resolution_algorithm>
+
+  <!-- ================================================================
+       SECTION 3: EXECUTION PLAN OUTPUT FORMAT
+       ================================================================ -->
+  <execution_plan_format>
+    <description>
+      The output of the dependency-resolve protocol is an execution plan
+      that the workflow engine uses to schedule and run production tasks.
+    </description>
+
+    <schema>
+      <field name="plan_id" type="string">
+        Unique identifier for this execution plan.
+      </field>
+      <field name="episode_id" type="string">
+        The episode this plan is for.
+      </field>
+      <field name="total_tasks" type="number">
+        Total number of tasks in the plan.
+      </field>
+      <field name="estimated_duration_seconds" type="number">
+        Estimated total wall-clock time based on critical path analysis.
+      </field>
+      <field name="critical_path" type="array">
+        Ordered list of task IDs on the critical path.
+      </field>
+      <field name="parallel_groups" type="array">
+        Ordered array of parallel groups. Each group contains tasks
+        that can execute simultaneously. Groups must execute in order
+        (group N+1 only starts when all tasks in group N are complete).
+        <item_schema>
+          <field name="group_index" type="number">
+            Zero-based index of this group in the execution order.
+          </field>
+          <field name="tasks" type="array">
+            List of tasks in this group that can run in parallel.
+            <task_schema>
+              <field name="id" type="string">Task node ID from the dependency graph.</field>
+              <field name="type" type="string">Asset type.</field>
+              <field name="tool" type="string">Tool to use.</field>
+              <field name="estimated_duration_seconds" type="number">Estimated duration.</field>
+              <field name="on_critical_path" type="boolean">Whether this task is on the critical path.</field>
+              <field name="slack_seconds" type="number">Available slack time before this task delays the plan.</field>
+            </task_schema>
+          </field>
+          <field name="group_estimated_duration_seconds" type="number">
+            Duration of the longest task in this group (determines
+            when the group completes, since tasks run in parallel).
+          </field>
+        </item_schema>
+      </field>
+    </schema>
+
+    <example_plan><![CDATA[
+plan_id: "dep-resolve-ep01-20260301T140000-b2c4"
+episode_id: "ep01"
+total_tasks: 9
+estimated_duration_seconds: 230
+critical_path:
+  - char-marcus-ref
+  - scene-01-frame
+  - scene-01-video
+  - episode-merge
+
+parallel_groups:
+  - group_index: 0
+    group_estimated_duration_seconds: 60
+    tasks:
+      - id: char-marcus-ref
+        type: character-ref
+        tool: dall-e-3
+        estimated_duration_seconds: 30
+        on_critical_path: true
+        slack_seconds: 0
+      - id: char-elena-ref
+        type: character-ref
+        tool: dall-e-3
+        estimated_duration_seconds: 30
+        on_critical_path: false
+        slack_seconds: 30
+      - id: narration-full
+        type: narration
+        tool: elevenlabs
+        estimated_duration_seconds: 45
+        on_critical_path: false
+        slack_seconds: 125
+      - id: music-track
+        type: music
+        tool: suno
+        estimated_duration_seconds: 60
+        on_critical_path: false
+        slack_seconds: 110
+      - id: sfx-pack
+        type: sfx
+        tool: elevenlabs-sfx
+        estimated_duration_seconds: 30
+        on_critical_path: false
+        slack_seconds: 140
+
+  - group_index: 1
+    group_estimated_duration_seconds: 20
+    tasks:
+      - id: scene-01-frame
+        type: first-frame
+        tool: dall-e-3
+        estimated_duration_seconds: 20
+        on_critical_path: true
+        slack_seconds: 0
+      - id: scene-02-frame
+        type: first-frame
+        tool: dall-e-3
+        estimated_duration_seconds: 20
+        on_critical_path: false
+        slack_seconds: 0
+
+  - group_index: 2
+    group_estimated_duration_seconds: 120
+    tasks:
+      - id: scene-01-video
+        type: video-clip
+        tool: runway-gen4
+        estimated_duration_seconds: 120
+        on_critical_path: true
+        slack_seconds: 0
+      - id: scene-02-video
+        type: video-clip
+        tool: runway-gen4
+        estimated_duration_seconds: 120
+        on_critical_path: false
+        slack_seconds: 0
+
+  - group_index: 3
+    group_estimated_duration_seconds: 60
+    tasks:
+      - id: episode-merge
+        type: merge
+        tool: ffmpeg
+        estimated_duration_seconds: 60
+        on_critical_path: true
+        slack_seconds: 0
+]]></example_plan>
+  </execution_plan_format>
+
+  <!-- ================================================================
+       SECTION 4: RE-PLANNING AFTER PARTIAL FAILURE
+       ================================================================ -->
+  <replanning>
+    <description>
+      When a workflow partially fails (some tasks succeed, others fail),
+      the dependency-resolve protocol can re-plan the remaining work.
+      This avoids re-executing tasks that already succeeded.
+    </description>
+
+    <procedure>
+      <step order="1">
+        Receive the list of completed task IDs from the handoff document
+        of the failed workflow run.
+      </step>
+      <step order="2">
+        Remove completed tasks from the dependency graph.
+      </step>
+      <step order="3">
+        For remaining tasks, update their depends_on lists to remove
+        references to completed tasks (since those dependencies are
+        already satisfied).
+      </step>
+      <step order="4">
+        Re-run the resolution algorithm on the reduced graph.
+      </step>
+      <step order="5">
+        Produce a new execution plan covering only the remaining tasks.
+        Include a `replanning_context` field that references the original
+        plan ID and lists which tasks were carried over.
+      </step>
+    </procedure>
+  </replanning>
+
+  <!-- ================================================================
+       SECTION 5: ERROR HANDLING
+       ================================================================ -->
+  <error_handling>
+    <on_error type="validation_failure">
+      <description>
+        Triggered when the dependency graph fails validation
+        (cycles, dangling references, missing required dependencies).
+      </description>
+      <action>
+        Halt the workflow. The dependency graph must be fixed before
+        production can proceed. Provide a detailed error report:
+        - The specific validation check that failed.
+        - The nodes involved in the failure.
+        - For cycles: the full cycle path.
+        - For dangling references: the missing node ID and which node references it.
+        - Suggestions for fixing the graph.
+      </action>
+    </on_error>
+
+    <on_error type="missing_file">
+      <description>
+        Triggered when the asset-dependency-graph.yaml file is missing.
+      </description>
+      <action>
+        Delegate to error-recovery.xml missing_file handler.
+        The graph file is critical; the workflow cannot proceed without it.
+        Suggest running the SSD generation workflow first.
+      </action>
+    </on_error>
+  </error_handling>
+
+</protocol>

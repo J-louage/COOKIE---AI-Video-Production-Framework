@@ -1,0 +1,33 @@
+name: create-style-guide
+workflow_id: create-style-guide
+module: production
+agent: character-designer
+slash_command: /production-create-style-guide
+description: "Create project visual style guide with VEO/Nano Banana tokens"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/2-pre-production/create-style-guide"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/prompt-engineering.md"
+  - "{project-root}/_cookie/skills/veo/SKILL.md"
+  - "{project-root}/_cookie/skills/nano-banana/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "all_style_sections_complete == true"
+    - check: "style_tokens_actionable == true"
+    - check: "negative_prompts_comprehensive == true"
+
+input_file_patterns:
+  canonical_script:
+    path: "{project-root}/episodes/{episode_id}/script/canonical-script.md"
+    load_strategy: "FULL_LOAD"
+  brand_guidelines:
+    path: "{project-root}/_cookie/_config/brand-guidelines.yaml"
+    load_strategy: "FULL_LOAD"

@@ -1,0 +1,40 @@
+name: remotion-assembly
+workflow_id: remotion-assembly
+module: production
+agent: motion-designer
+slash_command: /production-remotion-assembly
+description: "Assemble video assets into a Remotion project with sequences, transitions, and audio"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/4-composition/remotion-assembly"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/remotion/SKILL.md"
+  - "{project-root}/_cookie/skills/shared/typography-standards.md"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  video_assets:
+    path: "{project-root}/episodes/{episode_id}/assets/video/"
+    load_strategy: "INDEX_GUIDED"
+  audio_assets:
+    path: "{project-root}/episodes/{episode_id}/assets/audio/"
+    load_strategy: "INDEX_GUIDED"
+  frame_assets:
+    path: "{project-root}/episodes/{episode_id}/assets/frames/"
+    load_strategy: "INDEX_GUIDED"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "remotion_project_builds == true"
+    - check: "all_scenes_sequenced == true"
+    - check: "transitions_applied == true"
+    - check: "audio_imported_and_synced == true"
+    - check: "timeline_duration_matches_ssd == true"

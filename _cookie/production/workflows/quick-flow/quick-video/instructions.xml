@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>quick-video</workflow>
+    <description>Rapid single-video production with minimal interaction steps</description>
+    <agent>director</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="receive_concept">
+      <action>Receive the video concept from the user. Collect: the idea or concept description, target duration (default: 60 seconds), format (default: brand-film), and aspect ratio (default: 16:9). Auto-detect if existing characters should be used by checking project-config.yaml shared_characters. Ask only essential clarifying questions — keep interaction to a minimum.</action>
+      <output>Video concept with target duration, format, and aspect ratio</output>
+    </step>
+
+    <step id="2" name="generate_abbreviated_script">
+      <action>Generate an abbreviated script directly from the concept. Skip the detailed multi-draft process used in the full pipeline. Create a simple scene list with: scene_id, description, duration, and camera/action notes. Target the specified duration by dividing it into 4-8 second VEO clips. Keep the script minimal — focus on visual storytelling over detailed dialogue.</action>
+      <output>Abbreviated script with scene list</output>
+    </step>
+
+    <step id="3" name="generate_simplified_ssd">
+      <action>Convert the abbreviated script directly into a simplified SSD. Use project-config.yaml defaults for VEO model, resolution, and speed. Skip detailed pre-production steps: no separate style guide, no dependency graph, no prompt library. Generate VEO prompts inline within each scene entry. Apply global negative prompt from project defaults. Set simple transitions (cuts only, no complex animations).</action>
+      <output>Simplified SSD with inline prompts</output>
+    </step>
+
+    <step id="4" name="cost_estimate_and_approval">
+      <action>Calculate a quick cost estimate based on the simplified SSD: count VEO calls (one per scene), calculate total VEO cost from pricing.yaml, add a 10% buffer (smaller than full pipeline's 20%). Present the estimate to the user. In YOLO mode, auto-approve. In normal mode, this is the primary interaction point — get user approval before spending.</action>
+      <output>Cost estimate approved</output>
+    </step>
+
+    <step id="5" name="generate_assets">
+      <action>Generate all video assets. For each scene: submit VEO text-to-video request with the inline prompt. Use existing shared character references if available (do not generate new character sheets). Run scenes in parallel where possible. Skip first/last frame generation (use text-to-video mode for all scenes). Log each generation cost to actuals.</action>
+      <output>All video clips generated</output>
+    </step>
+
+    <step id="6" name="basic_composition">
+      <action>Assemble a basic Remotion composition from the generated clips. Use simple cuts between scenes (no complex transitions). Add minimal text overlays only if specified in the concept (title card at start, CTA at end). Skip audio sync complexity — use VEO native audio only. Skip subtitle generation.</action>
+      <output>Basic Remotion composition assembled</output>
+    </step>
+
+    <step id="7" name="render_and_deliver">
+      <action>Render the final video at the standard resolution profile. Use h264 codec with CRF from the resolution profile. Generate a single output format only (no multi-format export). Run automated QA checks: verify duration matches target (within 2s tolerance), verify resolution is correct, verify file is playable. Present the final video to the user for review. Log the total cost.</action>
+      <output>Final video rendered and delivered</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Concept captured with target duration and format</gate>
+    <gate>Abbreviated script generated with scene breakdown</gate>
+    <gate>Simplified SSD created with inline prompts</gate>
+    <gate>Cost estimate calculated and approved</gate>
+    <gate>All video clips generated via VEO</gate>
+    <gate>Basic composition assembled with simple cuts</gate>
+    <gate>Final video rendered at target resolution</gate>
+    <gate>Automated QA checks passed</gate>
+    <gate>Total cost logged to actuals</gate>
+  </quality-gates>
+</instructions>

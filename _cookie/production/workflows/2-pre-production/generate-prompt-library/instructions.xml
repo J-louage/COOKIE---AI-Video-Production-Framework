@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>generate-prompt-library</workflow>
+    <description>Expand character tokens and generate final prompts for all SSD scenes</description>
+    <agent>prompt-engineer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_ssd_and_references">
+      <action>Load the SSD, all character identity files, and the style guide. For each character referenced in the SSD, load their prompt_tokens (core_identity, style_modifiers, negative_tokens, consistency_anchors). Load the style guide's style tokens (master prefix, scene-type tokens) and negative prompts (global, character, style, quality).</action>
+      <output>SSD, character tokens, and style tokens loaded</output>
+    </step>
+
+    <step id="2" name="expand_character_placeholders">
+      <action>For each scene/clip prompt in the SSD, find all [character:X] placeholders and expand them to the character's full core_identity tokens. Place expanded character tokens at the front of the prompt (front-loading) since AI models weight earlier tokens more heavily. Also expand [outfit:Y] placeholders to the corresponding outfit's prompt_tokens from the character's active style.</action>
+      <output>Prompts with all character and outfit placeholders expanded</output>
+    </step>
+
+    <step id="3" name="prepend_style_tokens">
+      <action>For each expanded prompt, prepend the appropriate style tokens: master style prefix first, then scene-type specific tokens (intro, content, transition, outro). Ensure style tokens enhance but do not contradict scene-specific visual directions already in the prompt.</action>
+      <output>Prompts with style tokens prepended</output>
+    </step>
+
+    <step id="4" name="append_negative_prompts">
+      <action>For each prompt, build the complete negative prompt by combining: global negative prompts from the style guide, character-specific negative tokens for each character in the scene, style-specific negatives, and quality negatives. Deduplicate negative tokens and order by importance.</action>
+      <output>Prompts with complete negative prompt sections</output>
+    </step>
+
+    <step id="5" name="validate_token_limits">
+      <action>For each final prompt (positive + negative), count tokens and verify the total is under 1024 tokens. If any prompt exceeds the limit: first try removing redundant style tokens, then try condensing character descriptions, then flag for manual review if still over. Log the token count for each prompt.</action>
+      <output>Token count validation report</output>
+    </step>
+
+    <step id="6" name="validate_camera_movements">
+      <action>For each clip prompt, verify that only one camera movement is specified (pan, zoom, dolly, static, etc.). Multiple camera movements in a single clip cause AI generation artifacts. If conflicts are found, keep the primary movement and remove or split the secondary into a separate clip suggestion.</action>
+      <output>Camera movement validation report</output>
+    </step>
+
+    <step id="7" name="validate_token_ordering">
+      <action>For each prompt, verify that character identity tokens appear before scene description tokens, which appear before style modifier tokens. This front-loading order ensures the most important visual elements receive the strongest model attention. Reorder if necessary.</action>
+      <output>Token ordering validation report</output>
+    </step>
+
+    <step id="8" name="generate_prompt_library">
+      <action>Compile all final prompts into a prompt library document: for each scene/clip, record the scene_id, clip_id, final_positive_prompt, final_negative_prompt, token_count, characters_referenced, style_tokens_applied, and a prompt_hash (for cache/dedup purposes). Save as episodes/{episode_id}/prompts/prompt-library.yaml.</action>
+      <output>Complete prompt library YAML file</output>
+    </step>
+
+    <step id="9" name="update_ssd_and_cross_reference">
+      <action>Update the SSD with references to the prompt library entries for each scene/clip. Cross-reference all prompts for consistency: same character should have similar token patterns across scenes, style tokens should be consistent, and no contradictory directions between adjacent scenes. Flag any inconsistencies.</action>
+      <output>Updated SSD with prompt library references and consistency report</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All [character:X] and [outfit:Y] placeholders are fully expanded</gate>
+    <gate>All prompts are under 1024 tokens (positive + negative combined)</gate>
+    <gate>Character identity tokens are front-loaded in every prompt</gate>
+    <gate>Negative prompts are present for every scene/clip</gate>
+    <gate>No conflicting camera movements within a single clip</gate>
+    <gate>Prompt consistency verified across scenes for same characters</gate>
+    <gate>Prompt library saved and cross-referenced with SSD</gate>
+  </quality-gates>
+</instructions>

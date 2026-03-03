@@ -1,0 +1,32 @@
+name: audio-to-script
+workflow_id: audio-to-script
+module: production
+agent: screenwriter
+slash_command: /production-audio-to-script
+description: "Convert audio/transcript into canonical script with visual scenes"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/1-ideation/audio-to-script"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/prompt-engineering.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "transcription_matches_audio == true"
+    - check: "scenes_aligned_to_narration == true"
+    - check: "visual_directions_added_for_every_segment == true"
+    - check: "script_follows_canonical_format == true"
+
+input_file_patterns:
+  format_presets:
+    path: "{project-root}/_cookie/_config/format-presets.yaml"
+    load_strategy: "FULL_LOAD"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"

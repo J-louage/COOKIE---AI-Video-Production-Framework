@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Framework — Protocol: Preflight Check
+  Pre-execution validation for workflow steps.
+
+  This protocol runs before every workflow step executes. It ensures
+  that all variables are resolved, all referenced files exist, all
+  required skills are loadable, and the config inheritance chain is
+  intact. If any check fails, the step does not execute.
+-->
+<protocol id="preflight-check" version="1.0">
+
+  <metadata>
+    <name>Preflight Check</name>
+    <description>
+      Validates all preconditions before a workflow step is allowed to execute.
+      Acts as a safety gate that catches configuration errors, missing files,
+      unresolved variables, and broken skill references before they cause
+      runtime failures mid-step.
+    </description>
+    <triggers>
+      <trigger>Automatically before every workflow step execution.</trigger>
+      <trigger>Manually via `preflight` command in the Director.</trigger>
+      <trigger>During workflow dry-run mode.</trigger>
+    </triggers>
+    <outputs>
+      <output>Preflight report (pass/fail with detailed findings).</output>
+      <output>Resolved variable map for the step.</output>
+    </outputs>
+  </metadata>
+
+  <!-- ================================================================
+       SECTION 1: VARIABLE RESOLUTION CHECK
+       ================================================================ -->
+  <check id="resolve_variables" order="1" severity="critical">
+    <name>Variable Resolution</name>
+    <description>
+      Scan the entire step definition for `{variable}` placeholders and
+      verify that every single one resolves to a concrete value from the
+      workflow context, environment, or config chain.
+    </description>
+
+    <scan_targets>
+      <target>Step input paths and selectors</target>
+      <target>Step output paths</target>
+      <target>Step parameters and arguments</target>
+      <target>Step condition expressions</target>
+      <target>Step skill references</target>
+      <target>Step prompt templates</target>
+    </scan_targets>
+
+    <procedure>
+      <step order="1">
+        Parse the step definition and extract all `{variable}` patterns
+        from every string field recursively.
+      </step>
+      <step order="2">
+        Build a unique set of all variable names referenced by the step.
+      </step>
+      <step order="3">
+        For each variable, attempt resolution in this order:
+        <resolution_chain>
+          <source priority="1" name="step_locals">
+            Variables defined in the step's own `locals` block.
+          </source>
+          <source priority="2" name="workflow_context">
+            Variables set by previous steps in the workflow context.
+          </source>
+          <source priority="3" name="workflow_params">
+            Parameters passed to the workflow at invocation time.
+          </source>
+          <source priority="4" name="episode_config">
+            Variables from the current episode's configuration.
+          </source>
+          <source priority="5" name="project_config">
+            Variables from the project-level COOKIE configuration.
+          </source>
+          <source priority="6" name="framework_defaults">
+            Default values defined in the COOKIE framework itself.
+          </source>
+        </resolution_chain>
+      </step>
+      <step order="4">
+        Record the resolved value and its source for each variable.
+      </step>
+      <step order="5">
+        If ANY variable cannot be resolved from any source:
+        - Mark this check as FAILED.
+        - Collect all unresolved variables into an error report.
+        - Trigger `on_error.unresolved_variable` from error-recovery.xml.
+        - HALT: The step must not execute.
+      </step>
+      <step order="6">
+        If all variables resolve, store the complete resolved variable map
+        in the preflight report for use during step execution.
+      </step>
+    </procedure>
+
+    <on_failure>
+      <action>Halt workflow immediately.</action>
+      <error_handler ref="error-recovery.xml#unresolved_variable" />
+      <report>
+        List all unresolved variables with:
+        - Variable name
+        - Location in step definition where it appears
+        - Sources that were checked
+        - Suggestion for where to define the missing variable
+      </report>
+    </on_failure>
+  </check>
+
+  <!-- ================================================================
+       SECTION 2: FILE EXISTENCE CHECK
+       ================================================================ -->
+  <check id="file_existence" order="2" severity="critical">
+    <name>File Existence Validation</name>
+    <description>
+      After all variables are resolved, verify that every file path
+      referenced by the step points to an actual file (or directory)
+      on disk. This prevents runtime errors from missing assets.
+    </description>
+
+    <scan_targets>
+      <target>All resolved input file paths</target>
+      <target>All resolved output directory paths (parent directories must exist)</target>
+      <target>Skill file paths (SKILL.md)</target>
+      <target>Config file paths referenced in the step</target>
+      <target>Asset paths from dependency graphs</target>
+    </scan_targets>
+
+    <procedure>
+      <step order="1">
+        Collect all file and directory paths from the step definition
+        after variable resolution has been applied.
+      </step>
+      <step order="2">
+        Categorize each path:
+        <categories>
+          <category name="required_input">
+            Files the step reads. Must exist. Failure is critical.
+          </category>
+          <category name="optional_input">
+            Files the step may read if available. Marked with `optional: true`.
+            Missing is acceptable — logged as info.
+          </category>
+          <category name="output_directory">
+            Parent directories for step outputs. Must exist or be creatable.
+          </category>
+          <category name="reference">
+            Files referenced for metadata or validation only.
+            Missing triggers a warning but does not block execution.
+          </category>
+        </categories>
+      </step>
+      <step order="3">
+        For each path, check existence on disk:
+        - For files: verify the file exists and is readable.
+        - For directories: verify the directory exists and is listable.
+        - For output directories: verify the parent exists; create if missing
+          and the step has `create_output_dirs: true`.
+      </step>
+      <step order="4">
+        Compile the results:
+        - If any required_input is missing → FAIL with `missing_file` error.
+        - If any output_directory parent is missing and cannot be created → FAIL.
+        - If optional_inputs are missing → log INFO, continue.
+        - If references are missing → log WARNING, continue.
+      </step>
+    </procedure>
+
+    <on_failure>
+      <action>Halt workflow for critical failures; warn for non-critical.</action>
+      <error_handler ref="error-recovery.xml#missing_file" />
+      <report>
+        For each missing file:
+        - Resolved absolute path
+        - Category (required/optional/output/reference)
+        - The input declaration that referenced it
+        - Suggested fix (check path, run setup, create directory)
+      </report>
+    </on_failure>
+  </check>
+
+  <!-- ================================================================
+       SECTION 3: SKILL LOADABILITY CHECK
+       ================================================================ -->
+  <check id="skill_loadable" order="3" severity="critical">
+    <name>Skill Loadability Validation</name>
+    <description>
+      Verify that every skill referenced by the step exists and can be
+      loaded. Skills are defined by SKILL.md files in the skills directory.
+      A skill is considered loadable if its SKILL.md file exists and
+      contains valid skill metadata.
+    </description>
+
+    <procedure>
+      <step order="1">
+        Extract all skill references from the step definition.
+        Skills are referenced by name in `skill:` fields or in
+        step type declarations (e.g., `type: skill/generate-image`).
+      </step>
+      <step order="2">
+        For each skill reference, resolve the skill directory path:
+        `{project-root}/_cookie/skills/{skill-name}/SKILL.md`
+      </step>
+      <step order="3">
+        Verify the SKILL.md file exists at the resolved path.
+      </step>
+      <step order="4">
+        Parse the SKILL.md file header to validate it contains the
+        required metadata fields:
+        <required_fields>
+          <field name="name">The skill's display name.</field>
+          <field name="description">What the skill does.</field>
+          <field name="inputs">Declared input parameters.</field>
+          <field name="outputs">Declared output parameters.</field>
+        </required_fields>
+      </step>
+      <step order="5">
+        Verify that the step's input parameters match the skill's
+        declared input schema. Flag type mismatches or missing required
+        inputs as warnings.
+      </step>
+      <step order="6">
+        If the SKILL.md file is missing or unparseable:
+        - Mark this check as FAILED.
+        - Report which skill could not be loaded and why.
+        - Suggest running skill discovery or checking the skill name.
+      </step>
+    </procedure>
+
+    <on_failure>
+      <action>Halt workflow. A missing skill cannot be executed.</action>
+      <report>
+        For each unloadable skill:
+        - Skill name as referenced in the step
+        - Expected SKILL.md path
+        - Reason for failure (file missing, parse error, missing metadata)
+        - Available skills that are similar (fuzzy name match)
+      </report>
+    </on_failure>
+  </check>
+
+  <!-- ================================================================
+       SECTION 4: CONFIG INHERITANCE CHAIN CHECK
+       ================================================================ -->
+  <check id="config_inheritance" order="4" severity="warning">
+    <name>Config Inheritance Chain Validation</name>
+    <description>
+      The COOKIE framework uses a layered configuration system where
+      project config inherits from framework defaults, and episode config
+      overrides project config. This check verifies the entire chain
+      resolves without conflicts or missing links.
+    </description>
+
+    <inheritance_chain>
+      <layer priority="1" name="framework_defaults">
+        <path>{project-root}/_cookie/_config/defaults.yaml</path>
+        <description>Base defaults shipped with the COOKIE framework.</description>
+        <required>true</required>
+      </layer>
+      <layer priority="2" name="project_config">
+        <path>{project-root}/_cookie/_config/project.yaml</path>
+        <description>Project-level overrides set by the creator.</description>
+        <required>true</required>
+      </layer>
+      <layer priority="3" name="episode_config">
+        <path>{episode_path}/config.yaml</path>
+        <description>Episode-specific configuration overrides.</description>
+        <required>false</required>
+      </layer>
+      <layer priority="4" name="step_overrides">
+        <path>Inline in the workflow step definition.</path>
+        <description>Per-step configuration overrides.</description>
+        <required>false</required>
+      </layer>
+    </inheritance_chain>
+
+    <procedure>
+      <step order="1">
+        Identify which config keys the current step depends on.
+        This includes any config references in the step definition
+        (e.g., `config.resolution`, `config.model`, `config.cost_limit`).
+      </step>
+      <step order="2">
+        For each config key, walk the inheritance chain from highest
+        priority (step_overrides) to lowest (framework_defaults) to
+        find the effective value.
+      </step>
+      <step order="3">
+        Verify that required config layers exist on disk:
+        - framework_defaults MUST exist. If missing → FAIL.
+        - project_config MUST exist. If missing → FAIL.
+        - episode_config is optional. If missing → use project_config values.
+      </step>
+      <step order="4">
+        Check for config conflicts:
+        - Type mismatches between layers (e.g., string vs number).
+        - Deprecated keys that have been renamed in newer versions.
+        - Unknown keys that do not exist in framework_defaults (potential typos).
+      </step>
+      <step order="5">
+        Produce the merged configuration for the step with full
+        traceability (which layer each value came from).
+      </step>
+    </procedure>
+
+    <on_failure>
+      <action>
+        For missing required config files: HALT.
+        For conflicts and warnings: LOG and continue with best-effort resolution.
+      </action>
+      <report>
+        - Config key in question
+        - Value found at each layer
+        - Conflict description (if any)
+        - Effective resolved value
+        - Source layer for the resolved value
+      </report>
+    </on_failure>
+  </check>
+
+  <!-- ================================================================
+       SECTION 5: PREFLIGHT REPORT
+       ================================================================ -->
+  <preflight_report>
+    <description>
+      After all checks complete, produce a consolidated preflight report.
+      This report is stored in the workflow context and optionally displayed
+      to the user depending on verbosity settings.
+    </description>
+
+    <format>
+      <field name="step_id">The workflow step being validated.</field>
+      <field name="timestamp">ISO 8601 timestamp of when preflight ran.</field>
+      <field name="overall_status">PASS, FAIL, or WARN.</field>
+      <field name="checks">
+        Array of individual check results:
+        <check_result>
+          <field name="check_id">ID of the check (e.g., resolve_variables).</field>
+          <field name="status">PASS, FAIL, or WARN.</field>
+          <field name="severity">critical or warning.</field>
+          <field name="findings">Array of detailed findings.</field>
+          <field name="duration_ms">How long the check took to run.</field>
+        </check_result>
+      </field>
+      <field name="resolved_variables">Complete variable map after resolution.</field>
+      <field name="merged_config">Effective configuration for the step.</field>
+      <field name="total_duration_ms">Total preflight check duration.</field>
+    </format>
+
+    <display_rules>
+      <rule verbosity="quiet">Only show FAIL results.</rule>
+      <rule verbosity="normal">Show FAIL and WARN results.</rule>
+      <rule verbosity="verbose">Show all results including PASS details.</rule>
+      <rule verbosity="debug">Show all results plus resolution chain traces.</rule>
+    </display_rules>
+  </preflight_report>
+
+  <!-- ================================================================
+       SECTION 6: DRY-RUN MODE
+       ================================================================ -->
+  <dry_run>
+    <description>
+      When the workflow is run in dry-run mode, the preflight check
+      executes for ALL steps in the workflow (not just the next step).
+      This provides a comprehensive validation report before any
+      execution begins.
+    </description>
+    <procedure>
+      <step order="1">
+        Iterate through every step in the workflow definition.
+      </step>
+      <step order="2">
+        Run all four preflight checks for each step.
+        Note: some variables may not be resolvable in dry-run mode
+        because they depend on outputs from previous steps. These are
+        flagged as DEFERRED rather than FAILED.
+      </step>
+      <step order="3">
+        Produce a consolidated dry-run report covering all steps.
+      </step>
+      <step order="4">
+        Present the report to the user with a summary:
+        - Total steps validated
+        - Steps that passed all checks
+        - Steps with warnings
+        - Steps with failures
+        - Steps with deferred checks
+      </step>
+    </procedure>
+  </dry_run>
+
+</protocol>

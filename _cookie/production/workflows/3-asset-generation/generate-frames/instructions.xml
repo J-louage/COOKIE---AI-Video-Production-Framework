@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>generate-frames</workflow>
+    <description>Generate first/last frames for VEO clips via Nano Banana</description>
+    <agent>cinematographer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_ssd_and_dependencies">
+      <action>Load the SSD and dependency graph. Identify all scenes and clips that require first frames or last frames to be generated via Nano Banana. Distinguish between frames that need AI generation (source: nano-banana) and frames that will be extracted from video clips later (source: extract). Only process nano-banana sourced frames in this workflow.</action>
+      <output>Frame generation queue with source classifications</output>
+    </step>
+
+    <step id="2" name="identify_frame_requirements">
+      <action>For each frame in the generation queue, determine: frame type (first-frame or last-frame), target resolution matching the VEO clip's output resolution, aspect ratio matching the VEO clip configuration, the scene context (what should be depicted), and any character references needed. Cross-reference with the prompt library for the corresponding scene/clip prompt.</action>
+      <output>Frame specification list with resolution, aspect ratio, and context</output>
+    </step>
+
+    <step id="3" name="generate_frames">
+      <action>For each frame requiring Nano Banana generation: build the image generation prompt using the corresponding scene prompt from the prompt library (adapted for still image rather than video), set the output resolution and aspect ratio to match the VEO clip target, apply cost gate (check remaining budget), call the Nano Banana API, log the generation cost, and save the frame image to episodes/{episode_id}/assets/frames/{scene_id}/{clip_id}-{first|last}-frame.png.</action>
+      <output>Generated frame images saved to correct paths</output>
+    </step>
+
+    <step id="4" name="skip_extract_frames">
+      <action>For frames marked as source: extract, log that these will be generated during the video generation workflow (extract from previous clip's last frame using ffmpeg). Update the dependency tracking to show these as "pending-extraction" rather than "pending-generation".</action>
+      <output>Extract-source frames logged as pending extraction</output>
+    </step>
+
+    <step id="5" name="update_dependency_tracking">
+      <action>Update the dependency graph to mark all generated frames as complete. Verify that downstream video clip dependencies are now unblocked (where first-frame was the only remaining prerequisite). Log total frame generation costs and update the running cost tracker.</action>
+      <output>Dependency graph updated with frame completion status</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All Nano Banana sourced frames are generated successfully</gate>
+    <gate>Frame resolution matches the corresponding VEO clip target resolution</gate>
+    <gate>Frame aspect ratio matches the corresponding VEO clip configuration</gate>
+    <gate>All frame files saved at the expected directory paths</gate>
+    <gate>Extract-source frames properly logged for later processing</gate>
+    <gate>Dependency graph updated to reflect frame completion</gate>
+    <gate>Frame generation costs logged and within budget</gate>
+  </quality-gates>
+</instructions>

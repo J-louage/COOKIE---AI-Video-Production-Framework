@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>final-render</workflow>
+    <description>Render the final full-resolution video from the Remotion composition</description>
+    <agent>editor</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_resolution_profile">
+      <action>Load the resolution profile from the SSD or project configuration. Extract the target resolution (e.g., 1920x1080, 2560x1440, 3840x2160), frame rate (24, 30, or 60 FPS), pixel format, color space, and any HDR settings. Verify the Remotion composition dimensions match the target resolution.</action>
+      <output>Resolution profile with all output specifications</output>
+    </step>
+
+    <step id="2" name="set_remotion_render_config">
+      <action>Configure Remotion render settings for full-quality output. Set resolution to the target from the resolution profile. Set codec to h264 or h265 based on project config. Set CRF to 18 for high quality (or as specified in config). Set pixel format to yuv420p for maximum compatibility. Enable all effects and transitions at full quality. Set concurrency to maximize render speed while maintaining stability.</action>
+      <output>Full-resolution render configuration applied</output>
+    </step>
+
+    <step id="3" name="render_full_resolution">
+      <action>Execute the full-resolution render via Remotion CLI: npx remotion render {composition-id} {output-path} with the full-quality configuration. Monitor render progress, memory usage, and estimated time to completion. Handle any render failures with diagnostic logging. For long renders, provide periodic progress updates. Save the output to a temporary location before final verification.</action>
+      <output>Rendered full-resolution video file</output>
+    </step>
+
+    <step id="4" name="verify_output">
+      <action>Verify the rendered output using FFmpeg probe (ffprobe). Check duration matches the composition duration within 0.5s tolerance. Verify resolution matches the target resolution exactly. Verify codec, pixel format, and frame rate match specifications. Check file size is within expected range (not suspiciously small indicating corruption, not excessively large indicating encoding issues). Verify audio streams are present with correct channel configuration.</action>
+      <output>Output verification report with all checks passed or failed</output>
+    </step>
+
+    <step id="5" name="save_to_exports">
+      <action>Move the verified render to the final exports directory: episodes/{episode_id}/exports/final/{episode_id}-final-{resolution}-{timestamp}.mp4. Create a render manifest file alongside containing: render date, duration, resolution, codec, file size, CRF, render time, and source composition hash. Update the episode status to indicate final render is complete.</action>
+      <output>Final render saved to exports/ with manifest</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Resolution profile loaded and validated against composition</gate>
+    <gate>Render configuration set to full quality with correct codec and CRF</gate>
+    <gate>Render completes without errors</gate>
+    <gate>Output duration matches composition within 0.5s tolerance</gate>
+    <gate>Output resolution matches target exactly</gate>
+    <gate>Codec, pixel format, and frame rate match specifications</gate>
+    <gate>File size within expected range</gate>
+    <gate>Audio streams present with correct configuration</gate>
+    <gate>Final file saved to exports/ with render manifest</gate>
+  </quality-gates>
+</instructions>

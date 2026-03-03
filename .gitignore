@@ -1,0 +1,17 @@
+# Implementation phases (internal planning docs)
+implementation-phases/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+package-lock.json
+
+# Environment files
+.env
+.env.*
+
+# Claude Code
+.claude/

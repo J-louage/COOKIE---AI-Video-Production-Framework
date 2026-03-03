@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Core Task: Review Continuity (T9)
+  Invocation: <invoke-task>review-continuity</invoke-task> or /cookie-continuity
+
+  Input:  Episode assets directory
+  Output: Continuity report with pass/warn/fail per scene boundary pair
+  Priority: P1
+
+  For each scene boundary: extracts the last frame of scene N
+  (ffmpeg -sseof -0.04) and the first frame of scene N+1, then checks
+  visual consistency across character appearance, lighting, and environment.
+-->
+<task id="T9" name="review-continuity" version="1.0">
+  <metadata>
+    <description>Review visual continuity across scene boundaries. Extracts boundary frames and checks for consistency in character appearance, lighting, and environment.</description>
+    <priority>P1</priority>
+    <phase>post-production</phase>
+  </metadata>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- INPUTS                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <inputs>
+    <input name="assets_directory" required="true">
+      <path>episodes/{episode_id}/assets/</path>
+      <description>Episode assets directory containing scene video clips.</description>
+    </input>
+    <input name="ssd" required="false">
+      <path>episodes/{episode_id}/ssd/scene-spec.yaml</path>
+      <description>Scene Specification Document for scene ordering and context.</description>
+    </input>
+  </inputs>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output>
+    <path>episodes/{episode_id}/validation/continuity-report.yaml</path>
+    <description>Continuity report with pass/warn/fail for each scene boundary pair.</description>
+  </output>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1: DISCOVER AND ORDER SCENE CLIPS                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="1" name="Discover Scene Clips">
+    <description>Identify and order all scene video clips for boundary analysis.</description>
+    <actions>
+      <action>Scan episodes/{episode_id}/assets/ for video files (.mp4, .mov, .webm)</action>
+      <action>If SSD is available, use scene order from scene-spec.yaml to determine sequence</action>
+      <action>If SSD is not available, sort by scene_id (alphanumeric) or filename convention</action>
+      <action>Use only the latest version of each scene's clip (highest version number)</action>
+      <action>Build ordered list: [{scene_id, clip_path, order}]</action>
+      <action>Verify at least 2 clips exist (need at least one boundary to check)</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2: EXTRACT BOUNDARY FRAMES                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="2" name="Extract Boundary Frames">
+    <description>For each consecutive scene pair, extract the last frame of scene N and first frame of scene N+1.</description>
+    <actions>
+      <action>
+        For each consecutive pair (scene_N, scene_N+1):
+
+        Extract LAST frame of scene_N:
+          ffmpeg -y -sseof -0.04 -i "{scene_N_clip}" -frames:v 1 -q:v 2 "{output_dir}/{scene_N}_last.png"
+
+        This seeks to 0.04 seconds before the end of the clip to capture the final visible frame.
+      </action>
+      <action>
+        Extract FIRST frame of scene_N+1:
+          ffmpeg -y -i "{scene_N+1_clip}" -frames:v 1 -q:v 2 "{output_dir}/{scene_N+1}_first.png"
+
+        This captures the very first frame of the next scene.
+      </action>
+      <action>
+        Store the frame pair:
+        {pair_id, scene_n_id, scene_n1_id, last_frame_path, first_frame_path}
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3: CHECK CHARACTER APPEARANCE CONTINUITY                      -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="3" name="Character Continuity">
+    <description>Assess character appearance consistency across each boundary.</description>
+    <actions>
+      <action>
+        For each frame pair, analyze:
+        - Character presence: same characters visible in both frames?
+        - Character appearance: consistent clothing, hairstyle, accessories?
+        - Character position: logically consistent with scene transition?
+        - Character scale: consistent relative size?
+
+        Scoring:
+        - "pass": characters are visually consistent
+        - "warn": minor differences (e.g., slight color shift)
+        - "fail": major inconsistency (missing character, wrong outfit)
+
+        Note: If SSD indicates a deliberate location change, adjust expectations.
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4: CHECK LIGHTING CONTINUITY                                  -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="4" name="Lighting Continuity">
+    <description>Assess lighting and color grading consistency across each boundary.</description>
+    <actions>
+      <action>
+        For each frame pair, analyze:
+        - Overall brightness: similar exposure levels?
+        - Color temperature: consistent warm/cool tone?
+        - Color palette: similar dominant colors?
+        - Contrast: similar dynamic range?
+        - Time of day: if same period, lighting should match
+
+        Scoring:
+        - "pass": lighting is consistent
+        - "warn": noticeable but minor lighting shift
+        - "fail": drastic lighting change without narrative justification
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5: CHECK ENVIRONMENT CONTINUITY                               -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="5" name="Environment Continuity">
+    <description>Assess environment and background consistency across each boundary.</description>
+    <actions>
+      <action>
+        For each frame pair, analyze:
+        - Setting: same location? If so, visually consistent?
+        - Background elements: consistent background objects?
+        - Weather/atmosphere: consistent sky, fog, rain?
+        - Perspective: logically continuous camera angle/distance?
+
+        Scoring:
+        - "pass": environment consistent or intentional transition per SSD
+        - "warn": minor environmental discrepancy
+        - "fail": unexpected environment change within same declared location
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 6: COMPUTE OVERALL STATUS AND WRITE REPORT                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="6" name="Compile Report">
+    <description>Determine overall status for each boundary pair and compile the report.</description>
+    <actions>
+      <action>
+        For each pair, overall_status =
+        - "pass": all three checks (character, lighting, environment) pass
+        - "warn": at least one check is "warn" but none are "fail"
+        - "fail": at least one check is "fail"
+      </action>
+      <action>
+        Episode-level summary:
+        - total_boundaries: count of scene pairs
+        - passed: count of "pass" pairs
+        - warned: count of "warn" pairs
+        - failed: count of "fail" pairs
+        - continuity_score: (passed / total_boundaries) * 100
+        - overall_status: "PASS" if failed == 0, "WARN" if only warnings, "FAIL" if any failures
+      </action>
+      <action>Ensure episodes/{episode_id}/validation/ directory exists</action>
+      <action>Write continuity-report.yaml</action>
+      <action>Keep extracted boundary frames in episodes/{episode_id}/validation/boundary-frames/ for manual review</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT SCHEMA                                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output_schema>
+    <![CDATA[
+# continuity-report.yaml
+
+episode_id: "{episode_id}"
+assets_path: "episodes/{episode_id}/assets/"
+reviewed_at: "{ISO-8601 timestamp}"
+
+summary:
+  total_boundaries: {int}
+  passed: {int}
+  warned: {int}
+  failed: {int}
+  continuity_score: {float, 0-100}
+  overall_status: "{PASS|WARN|FAIL}"
+
+scene_pairs:
+  - pair_id: "{scene_N_id}->{scene_N+1_id}"
+    scene_n:
+      scene_id: "{scene_N_id}"
+      clip_path: "{relative path}"
+      last_frame: "{path to extracted frame}"
+    scene_n_plus_1:
+      scene_id: "{scene_N+1_id}"
+      clip_path: "{relative path}"
+      first_frame: "{path to extracted frame}"
+    overall_status: "{pass|warn|fail}"
+    checks:
+      character_continuity:
+        status: "{pass|warn|fail}"
+        details: "{findings}"
+      lighting_continuity:
+        status: "{pass|warn|fail}"
+        details: "{findings}"
+      environment_continuity:
+        status: "{pass|warn|fail}"
+        details: "{findings}"
+    notes: "{additional observations}"
+
+recommendations:
+  - pair: "{scene_N_id}->{scene_N+1_id}"
+    issue: "{description}"
+    suggestion: "{recommended fix}"
+
+boundary_frames_directory: "episodes/{episode_id}/validation/boundary-frames/"
+    ]]>
+  </output_schema>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ERROR HANDLING                                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <error_handling>
+    <error condition="Assets directory not found">
+      <action>HALT: "Assets directory not found at episodes/{episode_id}/assets/"</action>
+    </error>
+    <error condition="Fewer than 2 scene clips">
+      <action>HALT: "At least 2 scene clips required for continuity review. Found {count}."</action>
+    </error>
+    <error condition="FFmpeg not installed">
+      <action>HALT: "FFmpeg is required for frame extraction but not found in PATH."</action>
+    </error>
+    <error condition="Frame extraction failure">
+      <action>WARN: "Failed to extract frames for boundary {scene_N}->{scene_N+1}. Skipping." Continue with remaining pairs.</action>
+    </error>
+    <error condition="SSD not found">
+      <action>WARN: "Scene spec not found. Using filename-based ordering. Intentional-transition detection unavailable."</action>
+    </error>
+    <error condition="Clip is corrupted">
+      <action>WARN for affected pairs. Mark as "error" status. Continue with remaining pairs.</action>
+    </error>
+  </error_handling>
+
+</task>

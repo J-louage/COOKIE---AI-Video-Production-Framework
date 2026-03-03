@@ -1,0 +1,26 @@
+name: quick-video
+workflow_id: quick-video
+module: production
+agent: director
+slash_command: /production-quick-video
+description: "Rapid single-video production with minimal interaction steps"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/quick-flow/quick-video"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/veo/SKILL.md"
+  - "{project-root}/_cookie/skills/nano-banana/SKILL.md"
+  - "{project-root}/_cookie/skills/remotion/SKILL.md"
+  - "{project-root}/_cookie/skills/ffmpeg/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "video_rendered == true"
+    - check: "cost_logged == true"
+    - check: "automated_qa_passed == true"

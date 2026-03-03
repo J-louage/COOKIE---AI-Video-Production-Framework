@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>text-animation</workflow>
+    <description>Create animated text overlays, titles, and subtitles within the Remotion composition</description>
+    <agent>motion-designer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_ssd_remotion_config">
+      <action>Load the SSD remotion configuration including text overlay definitions, typography settings, animation presets, subtitle preferences, and brand style guide. Extract all text entries with their content, timing, position, and animation type. Verify the Remotion project is loaded and ready for component creation.</action>
+      <output>Validated text overlay configuration from SSD</output>
+    </step>
+
+    <step id="2" name="create_component_instances">
+      <action>For each text overlay defined in the SSD, create a Remotion component instance. Use the appropriate text component template (title card, lower third, callout, caption, or full-screen text). Set the text content, font family, font size, font weight, color, and any text shadow or outline properties according to the brand style guide and typography standards.</action>
+      <output>Text component instances created for all overlays</output>
+    </step>
+
+    <step id="3" name="configure_animation_and_timing">
+      <action>Configure animation properties for each text component. Supported animations include: fade-in/fade-out, slide-in from direction, typewriter effect, scale-up, and bounce. Set animation duration, easing curve (using Remotion Easing functions), and delay. Convert SSD timestamps to frame numbers for enter and exit animations. Ensure text appears and disappears at the correct moments.</action>
+      <output>Animations configured with correct timing for all text overlays</output>
+    </step>
+
+    <step id="4" name="configure_position">
+      <action>Position each text overlay according to the SSD specification. Apply safe-zone margins (10% from edges for broadcast safety). For lower thirds, position at the bottom third of the frame with consistent padding. For titles, center vertically and horizontally. For callouts, position near the referenced visual element. Verify no text overlays collide with each other at any point in the timeline.</action>
+      <output>All text overlays positioned correctly within safe zones</output>
+    </step>
+
+    <step id="5" name="generate_subtitles">
+      <action>If subtitles are enabled in the SSD configuration, generate subtitle components from the narration text and timing data. Create word-level or sentence-level subtitle components based on the subtitle_mode setting. Style subtitles according to the brand guide (background box, text color, font size). Position subtitles at the bottom center with safe-zone compliance. Ensure subtitles do not overlap with other text overlays.</action>
+      <output>Subtitle components generated and positioned (if enabled)</output>
+    </step>
+
+    <step id="6" name="validate_readability">
+      <action>Validate text readability for all overlays and subtitles. Check minimum font size (no smaller than 24px at 1080p). Verify contrast ratio between text and background meets WCAG AA standard (minimum 4.5:1). Confirm text display duration allows sufficient reading time (minimum 3 seconds for short text, 1 second per 3 words for longer text). Verify no text is clipped by frame edges. Generate a readability report.</action>
+      <output>Readability validation report for all text elements</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Text component created for every overlay defined in the SSD</gate>
+    <gate>Typography follows brand style guide and typography standards</gate>
+    <gate>Animations configured with correct timing and easing</gate>
+    <gate>All text positioned within broadcast safe zones (10% margins)</gate>
+    <gate>No text overlays collide at any point in the timeline</gate>
+    <gate>Subtitles generated from narration text if enabled in SSD</gate>
+    <gate>Minimum font size of 24px at 1080p maintained</gate>
+    <gate>Text contrast ratio meets WCAG AA (4.5:1 minimum)</gate>
+    <gate>Display duration allows sufficient reading time</gate>
+  </quality-gates>
+</instructions>

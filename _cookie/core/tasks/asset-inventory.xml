@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Core Task: Asset Inventory (T4)
+  Invocation: <invoke-task>asset-inventory</invoke-task> or /cookie-assets
+
+  Input:  episodes/{episode_id}/assets/ directory
+  Output: Structured table of all assets with metadata
+
+  Scans all scene directories under an episode's assets/ folder, lists all
+  files with metadata including asset type, version, file size, and status.
+-->
+<task id="T4" name="asset-inventory" version="1.0">
+  <metadata>
+    <description>Scan an episode's assets directory and produce a structured inventory of all generated assets with metadata, version tracking, and status.</description>
+    <priority>P2</priority>
+    <phase>post-production</phase>
+  </metadata>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- INPUTS                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <inputs>
+    <input name="assets_directory" required="true">
+      <path>episodes/{episode_id}/assets/</path>
+      <description>Root assets directory for the episode. Contains subdirectories per scene, each with generated video, narration, frames, and SFX files.</description>
+    </input>
+  </inputs>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output>
+    <path>episodes/{episode_id}/asset-inventory.yaml</path>
+    <description>Structured inventory listing every asset with full metadata.</description>
+  </output>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1: SCAN DIRECTORY TREE                                       -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="1" name="Scan Directory Tree">
+    <description>Recursively scan the episode assets directory to discover all files.</description>
+    <actions>
+      <action>Walk episodes/{episode_id}/assets/ recursively</action>
+      <action>Ignore hidden files (.*), .DS_Store, Thumbs.db, and __MACOSX directories</action>
+      <action>Record the full relative path from the episode root for each file</action>
+      <action>Map each file to its parent scene directory (extract scene_id from path)</action>
+      <action>Files directly under assets/ (not in a scene folder) are tagged as "unassigned"</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2: CLASSIFY ASSET TYPES                                      -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="2" name="Classify Asset Types">
+    <description>Determine the asset type for each file based on extension and naming conventions.</description>
+    <actions>
+      <action>
+        Classification rules by extension and context:
+
+        VIDEO: .mp4, .mov, .webm -> "video"
+        NARRATION: .mp3, .wav in narration/ subdirectory or named narration* -> "narration"
+        SFX: .mp3, .wav in sfx/ subdirectory or named sfx* -> "sfx"
+        MUSIC: .mp3, .wav in music/ subdirectory or named music*, bgm* -> "music"
+        FRAME: .png, .jpg, .jpeg, .webp named first-frame*, last-frame*, reference-* -> "frame"
+        IMAGE: .png, .jpg, .jpeg, .webp (other images) -> "frame"
+        SUBTITLE: .srt, .vtt -> "subtitle"
+        METADATA: .json, .yaml, .yml -> "metadata"
+        OTHER: anything else -> "other"
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3: EXTRACT VERSION INFO                                      -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="3" name="Extract Version Info">
+    <description>Detect version numbers from file naming conventions and identify latest versions.</description>
+    <actions>
+      <action>
+        Expected naming pattern: {name}-v{version}.{ext} or {name}_v{version}.{ext}
+        Extract version number from filename (e.g., v1, v2, v3).
+        If no version in filename, default to version 1.
+      </action>
+      <action>
+        For each unique scene_id + asset_type combination:
+        - Identify the highest version number as the "latest" version
+        - Mark all older versions as "superseded"
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4: COLLECT FILE METADATA                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="4" name="Collect File Metadata">
+    <description>Gather filesystem metadata for each discovered asset.</description>
+    <actions>
+      <action>
+        For each file, collect:
+        - file_path: relative path from episode root
+        - file_name: basename
+        - file_size_bytes: raw byte count
+        - file_size_human: human-readable (KB, MB, GB)
+        - created_at: file creation timestamp (ISO-8601)
+        - modified_at: file modification timestamp (ISO-8601)
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5: DETERMINE STATUS                                          -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="5" name="Determine Status">
+    <description>Assign a status to each asset based on markers and cross-references.</description>
+    <actions>
+      <action>
+        Status determination rules:
+        - "generated": file exists, is the latest version, no approval/flag marker
+        - "approved": file has .approved marker or is listed in approvals.yaml
+        - "flagged": file has .flagged marker or is listed in flags.yaml
+        - "superseded": a newer version exists for the same scene_id + asset_type
+        - "missing": referenced in scene-spec.yaml but no file found
+        - "corrupt": file exists but has 0 bytes
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 6: CHECK FOR MISSING ASSETS                                  -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="6" name="Cross-Reference SSD">
+    <description>Cross-reference against the SSD to identify expected but missing assets.</description>
+    <actions>
+      <action>
+        Read episodes/{episode_id}/ssd/scene-spec.yaml (if it exists).
+        For each scene defined in the SSD:
+        - veo scene -> expect at least one video file
+        - imagen/nano-banana frame -> expect image file
+        - chirp/elevenlabs narration -> expect audio file
+        - sfx -> expect sfx audio file
+        Add "missing" entries for expected but not found assets.
+      </action>
+      <action>If SSD not found, skip missing-asset detection with a warning.</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 7: COMPUTE SUMMARY AND WRITE                                 -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="7" name="Compute Summary and Write">
+    <description>Calculate inventory statistics and write the output file.</description>
+    <actions>
+      <action>
+        Compute summary statistics:
+        - total_assets: count of all discovered files
+        - total_size_bytes / total_size_human
+        - by_type: count and size per asset type (video, narration, frame, sfx, music, subtitle, metadata, other)
+        - by_status: count per status (generated, approved, flagged, superseded, missing)
+        - by_scene: asset count and completion percentage per scene_id
+      </action>
+      <action>Write episodes/{episode_id}/asset-inventory.yaml</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT SCHEMA                                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output_schema>
+    <![CDATA[
+# asset-inventory.yaml
+
+episode_id: "{episode_id}"
+generated_at: "{ISO-8601 timestamp}"
+assets_root: "episodes/{episode_id}/assets/"
+
+summary:
+  total_assets: {int}
+  total_size_bytes: {int}
+  total_size_human: "{e.g., 1.2 GB}"
+  by_type:
+    video: {count: {int}, size_bytes: {int}}
+    narration: {count: {int}, size_bytes: {int}}
+    frame: {count: {int}, size_bytes: {int}}
+    sfx: {count: {int}, size_bytes: {int}}
+    music: {count: {int}, size_bytes: {int}}
+    subtitle: {count: {int}, size_bytes: {int}}
+    metadata: {count: {int}, size_bytes: {int}}
+    other: {count: {int}, size_bytes: {int}}
+  by_status:
+    generated: {int}
+    approved: {int}
+    flagged: {int}
+    superseded: {int}
+    missing: {int}
+
+assets:
+  - scene_id: "{scene_id}"
+    asset_type: "{video|narration|frame|sfx|music|subtitle|metadata|other}"
+    version: {int}
+    is_latest: {boolean}
+    file_path: "{relative path}"
+    file_name: "{filename}"
+    file_size_bytes: {int}
+    file_size_human: "{e.g., 24.5 MB}"
+    modified_at: "{ISO-8601}"
+    status: "{generated|approved|flagged|superseded|missing}"
+
+missing_assets:
+  - scene_id: "{scene_id}"
+    expected_type: "{asset_type}"
+    expected_from: "{tool_name}"
+    note: "Defined in scene-spec.yaml but no file found"
+    ]]>
+  </output_schema>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ERROR HANDLING                                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <error_handling>
+    <error condition="Assets directory not found">
+      <action>HALT: "Assets directory not found at episodes/{episode_id}/assets/"</action>
+    </error>
+    <error condition="Empty assets directory">
+      <action>Write inventory with zero assets and warning: "Assets directory exists but contains no files."</action>
+    </error>
+    <error condition="Permission error reading file">
+      <action>WARN for that file, mark status as "error", continue scanning remaining files.</action>
+    </error>
+    <error condition="SSD not found for cross-reference">
+      <action>WARN: "Scene spec not found -- missing asset detection skipped."</action>
+    </error>
+  </error_handling>
+
+</task>

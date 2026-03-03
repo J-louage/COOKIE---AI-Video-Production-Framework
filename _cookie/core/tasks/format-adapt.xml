@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Core Task: Format Adaptation (T5)
+  Invocation: <invoke-task>format-adapt</invoke-task> or /cookie-format-adapt
+
+  Input:  Primary SSD (scene-spec.yaml) + target format preset
+  Output: Derived SSD for the target format
+
+  Adapts a primary Scene Specification Document for a different output format
+  by filtering scenes by priority, adjusting timing for max_duration, noting
+  crop strategy, and adding hook/CTA elements for social formats.
+-->
+<task id="T5" name="format-adapt" version="1.0">
+  <metadata>
+    <description>Adapt a primary SSD to a target format by filtering scenes by priority, adjusting timing, applying crop strategies, and inserting platform-specific hooks and CTAs.</description>
+    <priority>P2</priority>
+    <phase>delivery</phase>
+  </metadata>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- INPUTS                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <inputs>
+    <input name="primary_ssd" required="true">
+      <path>episodes/{episode_id}/ssd/scene-spec.yaml</path>
+      <description>The primary (full-length) Scene Specification Document.</description>
+    </input>
+    <input name="target_format" required="true">
+      <description>Target format preset identifier (e.g., youtube_long, youtube_short, instagram_reel, tiktok, twitter_clip, linkedin_video, thumbnail, trailer).</description>
+    </input>
+    <input name="format_presets" required="true">
+      <path>_cookie/_config/format-presets.yaml</path>
+      <description>Configuration file defining all format presets with their constraints and rules.</description>
+    </input>
+  </inputs>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output>
+    <path>episodes/{episode_id}/formats/{target_format}/scene-spec.yaml</path>
+    <description>Derived SSD tailored to the target format's constraints.</description>
+  </output>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1: LOAD INPUTS AND RESOLVE FORMAT PRESET                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="1" name="Load Inputs">
+    <description>Load primary SSD and target format configuration.</description>
+    <actions>
+      <action>Read and parse episodes/{episode_id}/ssd/scene-spec.yaml</action>
+      <action>Read and parse _cookie/_config/format-presets.yaml</action>
+      <action>Validate that target_format exists in format-presets.yaml</action>
+      <action>
+        Extract format preset fields:
+        - aspect_ratio (16:9, 9:16, 1:1, 4:5)
+        - max_duration (seconds)
+        - min_duration (seconds)
+        - resolution
+        - crop_strategy (center-crop, center-subject, letterbox, pan-scan)
+        - requires_hook (boolean)
+        - hook_max_duration (seconds)
+        - requires_cta (boolean)
+        - cta_position (end, overlay)
+        - cta_max_duration (seconds)
+        - priority_filter: [essential, important, supplementary]
+        - pacing_multiplier (float)
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2: CALCULATE TIME BUDGET                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="2" name="Calculate Time Budget">
+    <description>Determine the available time for content scenes after reserving time for hook and CTA.</description>
+    <actions>
+      <action>Start with max_duration from the format preset</action>
+      <action>If requires_hook == true: subtract hook_max_duration</action>
+      <action>If requires_cta == true AND cta_position == "end": subtract cta_max_duration</action>
+      <action>available_content_time = max_duration - hook_time - cta_time</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3: FILTER SCENES BY PRIORITY                                 -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="3" name="Filter Scenes by Priority">
+    <description>Select scenes based on priority tiers and available time budget.</description>
+    <actions>
+      <action>
+        Each scene in the SSD has a priority field: essential, important, or supplementary.
+
+        Phase 1: Include all "essential" scenes. Calculate running_duration.
+        Phase 2: If running_duration &lt; available_content_time, add "important" scenes in order.
+        Phase 3: If still room, add "supplementary" scenes in order.
+
+        Stop adding when the next scene would exceed available_content_time.
+      </action>
+      <action>
+        If essential scenes alone exceed available_content_time:
+        - Flag WARNING: essential content exceeds time budget
+        - Proceed to timing adjustment step
+      </action>
+      <action>
+        Record excluded scenes with reasons:
+        - "{scene_id}: excluded -- priority '{priority}' not included for {target_format}"
+        - "{scene_id}: excluded -- exceeded time budget"
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4: ADJUST TIMING                                             -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="4" name="Adjust Timing">
+    <description>Compress or adjust scene durations to fit the time budget.</description>
+    <actions>
+      <action>
+        total_selected_duration = sum of selected scene durations
+        If total_selected_duration &lt;= available_content_time: no adjustment needed.
+      </action>
+      <action>
+        If total_selected_duration > available_content_time:
+        Apply tiered trimming — never reduce essential scenes:
+
+        Tier 1: Remove supplementary scenes (lowest priority first) until within budget.
+        Tier 2: If still over budget, remove important scenes (lowest priority first).
+        Tier 3: If only essential scenes remain and still over budget:
+          - Apply proportional scaling ONLY to essential scenes as last resort
+          - scale_factor = available_content_time / total_essential_duration
+          - For each essential scene: adjusted_duration = original_duration * scale_factor
+          - Snap to valid VEO durations: [4, 5, 6, 7, 8] (pick closest valid value)
+          - Flag WARNING: "Essential scenes compressed by {percent}%"
+        - Verify total adjusted duration fits within available_content_time
+      </action>
+      <action>
+        Apply pacing_multiplier if set:
+        - If pacing_multiplier > 1.0: scenes should feel faster (shorter transitions)
+        - If pacing_multiplier &lt; 1.0: scenes should feel slower (longer holds)
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5: NOTE CROP STRATEGY                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="5" name="Apply Crop Strategy">
+    <description>Annotate each scene with the appropriate crop strategy for aspect ratio conversion.</description>
+    <actions>
+      <action>
+        Determine source vs target aspect ratio:
+        - If source == target: crop_strategy = "none"
+        - If conversion needed, apply the preset's default crop_strategy
+      </action>
+      <action>
+        Available crop strategies:
+        - center-crop: Crop from center, losing edges. Best for generic scenes.
+        - center-subject: Crop centered on primary subject. Best for character scenes.
+        - letterbox: Add black bars to preserve full frame. Preserves all content.
+        - pan-scan: Animated pan across the wider frame. Best for establishing shots.
+      </action>
+      <action>
+        Per-scene override logic:
+        - Scenes with characters: prefer center-subject
+        - Scenes with wide landscapes: prefer pan-scan
+        - Screen recordings: prefer center-crop
+        - Text-heavy scenes: prefer letterbox
+      </action>
+      <action>
+        Generate crop calculations and FFmpeg filter values per scene.
+
+        Example — center-crop from 16:9 (1920x1080) to 1:1 (1080x1080):
+          crop_x = (1920 - 1080) / 2 = 420
+          crop_y = 0
+          crop_width = 1080
+          crop_height = 1080
+          ffmpeg_filter = "crop=1080:1080:420:0"
+
+        Example — center-crop from 16:9 (1920x1080) to 9:16 (608x1080):
+          crop_x = (1920 - 608) / 2 = 656
+          crop_y = 0
+          crop_width = 608
+          crop_height = 1080
+          ffmpeg_filter = "crop=608:1080:656:0"
+
+        Example — letterbox from 16:9 (1920x1080) to 1:1 (1080x1080):
+          scale_width = 1080
+          scale_height = 607
+          pad_top = (1080 - 607) / 2 = 236
+          pad_bottom = 1080 - 607 - 236 = 237
+          ffmpeg_filter = "scale=1080:-2,pad=1080:1080:0:236:black"
+
+        Example — letterbox from 16:9 (1920x1080) to 9:16 (1080x1920):
+          scale_width = 1080
+          scale_height = 607
+          pad_top = (1920 - 607) / 2 = 656
+          pad_bottom = 1920 - 607 - 656 = 657
+          ffmpeg_filter = "scale=1080:-2,pad=1080:1920:0:656:black"
+
+        Example — center-subject: Same as center-crop but offset crop_x/crop_y
+        based on subject position from SSD character_refs or scene description.
+
+        Example — pan-scan: Generate keyframe pairs at scene start/end:
+          keyframe_start = { crop_x: 0, crop_y: 0 }
+          keyframe_end = { crop_x: 840, crop_y: 0 }
+          ffmpeg_filter = "crop=1080:1080:'420+420*t/{duration}':0"
+      </action>
+      <action>Add crop_strategy, crop_metadata, and ffmpeg_filter to each scene in the derived SSD</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 6: REPOSITION TEXT OVERLAYS                                  -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="6" name="Reposition Text Overlays">
+    <description>Adjust text overlay positions and sizes for the target aspect ratio's safe zones.</description>
+    <actions>
+      <action>
+        Load safe zone definitions for the target aspect ratio:
+        - 16:9: title_safe { top: 5%, bottom: 5%, left: 5%, right: 5% }
+        - 9:16: title_safe { top: 10%, bottom: 15%, left: 8%, right: 8% }, caption_zone { top: 60%, bottom: 85% }
+        - 1:1: title_safe { top: 8%, bottom: 8%, left: 8%, right: 8% }
+      </action>
+      <action>
+        For each text overlay in the scene:
+        - Recalculate x and y positions to fit within the target safe zone
+        - If the text was at "center" in 16:9, keep it centered in the new ratio
+        - If the text was positioned at specific coordinates, scale proportionally to the new dimensions
+        - Ensure no text extends beyond the title safe zone boundaries
+      </action>
+      <action>
+        Scale font sizes proportionally to the new aspect ratio:
+        - For 16:9 to 9:16 conversion: reduce font size by approximately 15-20% (narrower frame)
+        - For 16:9 to 1:1 conversion: reduce font size by approximately 10% (less horizontal space)
+        - Ensure minimum readable size is maintained (no smaller than 24px at 1080p equivalent)
+      </action>
+      <action>
+        For captions and subtitles:
+        - In 9:16: position in the caption_zone (60-85% from top) to avoid platform UI overlays
+        - In 1:1: position in lower 20% of frame
+        - In 16:9: position in lower 10% of frame (standard subtitle position)
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 7: ADD HOOK AND CTA                                          -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="7" name="Add Hook and CTA">
+    <description>Insert hook and call-to-action elements if required by the social format.</description>
+    <actions>
+      <action>
+        If requires_hook == true:
+        - Create a hook scene at position 0
+        - Duration: hook_max_duration
+        - Source: derive from the most visually impactful essential scene
+        - Purpose: attention-grabbing opening for {format_name}
+      </action>
+      <action>
+        If requires_cta == true:
+        - If cta_position == "end": append CTA as final scene with cta_max_duration
+        - If cta_position == "overlay": add CTA as overlay metadata on the final content scene
+        - Content: subscribe/follow/like prompt appropriate for the target platform
+      </action>
+      <action>
+        If add_captions == true (or target format requires always-on captions):
+        - Enable subtitles on every scene: set remotion.subtitles.enabled = true
+        - Set subtitle style appropriate for target platform:
+          - 9:16 (TikTok/Reels): style = "tiktok-center"
+          - 1:1 (Instagram feed): style = "minimal-bottom"
+          - 16:9 (YouTube): style = "minimal-bottom"
+        - If narration text exists per scene, use it as subtitle source
+        - If no narration, flag scene for manual subtitle entry
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 8: WRITE DERIVED SSD                                         -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="8" name="Write Derived SSD">
+    <description>Write the adapted SSD to the format output directory.</description>
+    <actions>
+      <action>Ensure episodes/{episode_id}/formats/{target_format}/ directory exists</action>
+      <action>Write scene-spec.yaml with the derived content</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT SCHEMA                                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output_schema>
+    <![CDATA[
+# Derived scene-spec.yaml for {target_format}
+
+episode_id: "{episode_id}"
+format: "{target_format}"
+derived_from: "episodes/{episode_id}/ssd/scene-spec.yaml"
+generated_at: "{ISO-8601 timestamp}"
+
+format_metadata:
+  name: "{format name}"
+  aspect_ratio: "{aspect_ratio}"
+  resolution: "{resolution}"
+  max_duration: {seconds}
+  crop_strategy: "{default strategy}"
+
+adaptation_summary:
+  original_scene_count: {int}
+  included_scene_count: {int}
+  excluded_scene_count: {int}
+  original_duration: {seconds}
+  adapted_duration: {seconds}
+  has_hook: {boolean}
+  has_cta: {boolean}
+
+scenes:
+  - scene_id: "{scene_id}"
+    original_duration: {seconds}
+    adapted_duration: {seconds}
+    priority: "{essential|important|supplementary}"
+    crop_strategy: "{none|center-crop|center-subject|letterbox|pan-scan}"
+    crop_metadata: {}
+    # ... all other original scene properties preserved
+
+excluded_scenes:
+  - scene_id: "{scene_id}"
+    priority: "{priority}"
+    reason: "{over_time_budget|low_priority|...}"
+    ]]>
+  </output_schema>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ERROR HANDLING                                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <error_handling>
+    <error condition="Primary SSD not found">
+      <action>HALT: "Primary scene specification not found at episodes/{episode_id}/ssd/scene-spec.yaml"</action>
+    </error>
+    <error condition="Format preset not found">
+      <action>HALT: "Format preset '{target_format}' not found in _cookie/_config/format-presets.yaml. Available: {list}"</action>
+    </error>
+    <error condition="No essential scenes">
+      <action>HALT: "No scenes with 'essential' priority found. Cannot create format adaptation."</action>
+    </error>
+    <error condition="Essential scenes exceed max_duration">
+      <action>WARN: "Essential scenes total {X}s exceeds max_duration {Y}s. Applying aggressive timing compression."</action>
+    </error>
+    <error condition="Scenes missing priority field">
+      <action>WARN: "Scene {scene_id} has no priority field. Defaulting to 'supplementary'."</action>
+    </error>
+  </error_handling>
+
+</task>

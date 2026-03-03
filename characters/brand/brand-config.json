@@ -1,0 +1,27 @@
+{
+  "brand_name": "",
+  "brand_id": "",
+  "tagline": "",
+  "logo_path": "characters/brand/logo/",
+  "color_primary": "",
+  "color_secondary": "",
+  "color_accent": "",
+  "font_heading": "",
+  "font_body": "",
+  "tone_of_voice": "",
+  "intro_template": "ref:shared-assets/intro-template/",
+  "outro_template": "ref:shared-assets/outro-template/",
+  "watermark": {
+    "enabled": false,
+    "position": "bottom-right",
+    "opacity": 0.3,
+    "image_path": ""
+  },
+  "social_handles": {
+    "youtube": "",
+    "instagram": "",
+    "tiktok": "",
+    "linkedin": "",
+    "twitter": ""
+  }
+}

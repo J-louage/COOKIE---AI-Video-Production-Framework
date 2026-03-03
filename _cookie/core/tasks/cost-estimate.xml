@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Core Task: Cost Estimate (T2)
+  Invocation: <invoke-task>cost-estimate</invoke-task> or /cookie-cost-estimate
+
+  Input:  SSD (scene-spec.yaml) + pricing.yaml + global.yaml
+  Output: _cost/estimates/{episode_id}-estimate.yaml
+
+  Calculates the estimated cost of producing all scenes in an SSD before
+  any API calls are made. Presents per-scene breakdown, tool totals,
+  retake buffer, and resolution alternatives comparing draft/standard/hd/4k.
+-->
+<task id="T2" name="cost-estimate" version="1.0">
+  <metadata>
+    <description>Generate a detailed cost estimate for an episode based on its Scene Specification Document (SSD) and pricing configuration.</description>
+    <priority>P2</priority>
+    <phase>pre-production</phase>
+  </metadata>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- INPUTS                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <inputs>
+    <input name="ssd" required="true">
+      <path>episodes/{episode_id}/ssd/scene-spec.yaml</path>
+      <description>Scene Specification Document containing all scene definitions, tool assignments, and parameters.</description>
+    </input>
+    <input name="pricing" required="true">
+      <path>_config/pricing.yaml</path>
+      <description>Pricing table with per-call costs for each tool at each resolution/quality tier.</description>
+    </input>
+    <input name="global_config" required="true">
+      <path>_config/global.yaml</path>
+      <description>Global configuration containing retake_budget_percent and other defaults.</description>
+    </input>
+  </inputs>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT                                                            -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output>
+    <path>_cost/estimates/{episode_id}-estimate.yaml</path>
+    <description>Structured cost estimate with per-scene breakdown, tool totals, retake buffer, and resolution alternatives.</description>
+  </output>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1: PARSE THE SSD                                             -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="1" name="Parse SSD">
+    <description>Parse the Scene Specification Document and extract all scenes with their tool configurations.</description>
+    <actions>
+      <action>Read and parse episodes/{episode_id}/ssd/scene-spec.yaml</action>
+      <action>Extract the full list of scenes from the scenes[] array</action>
+      <action>
+        For each scene, identify:
+        - scene_id
+        - tool (veo, imagen, chirp, nano-banana, elevenlabs, playwright, etc.)
+        - model variant and speed setting
+        - resolution / quality tier
+        - duration (for video tools)
+        - number of expected API calls (clips, frames, audio segments)
+        - input_mode (text-to-video, image-to-video, interpolation)
+      </action>
+      <action>Build a scene manifest: list of {scene_id, tool, model, speed, resolution, duration, call_count}</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2: LOAD PRICING TABLE                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="2" name="Load Pricing">
+    <description>Load and index the pricing configuration.</description>
+    <actions>
+      <action>Read _config/pricing.yaml</action>
+      <action>Build a lookup table: pricing[tool][model][speed][resolution] -> cost_per_call or cost_per_second</action>
+      <action>Validate that every tool referenced in the SSD has a corresponding pricing entry</action>
+      <action>If a tool/model combination is missing from pricing, flag as WARNING and use $0.00 with annotation</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3: LOAD GLOBAL CONFIG                                        -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="3" name="Load Global Config">
+    <description>Load the global configuration for retake budget and defaults.</description>
+    <actions>
+      <action>Read _config/global.yaml</action>
+      <action>Extract retake_budget_percent (default to 20 if not specified)</action>
+      <action>Extract default_veo_model, default_veo_speed, default_resolution_profile</action>
+      <action>These defaults are used when a scene does not specify its own values</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4: CALCULATE PER-SCENE COSTS                                 -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="4" name="Calculate Per-Scene Costs">
+    <description>Calculate the estimated cost for each scene based on its tool, model, resolution, and call count.</description>
+    <actions>
+      <action>
+        For each scene in the scene manifest:
+          1. Resolve the tool, model, speed, resolution (use scene-level overrides, fall back to global defaults)
+          2. Look up the unit cost: pricing[tool][model][speed][resolution]
+          3. For per-second tools (VEO): scene_cost = call_count * duration * cost_per_second
+          4. For per-call tools (Nano Banana/Imagen): scene_cost = call_count * cost_per_call
+          5. For per-character tools (ElevenLabs/Chirp): scene_cost = (character_count / 1000) * cost_per_1000_chars
+          6. Store: {scene_id, tool, model, resolution, call_count, cost_per_unit, scene_cost}
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5: CALCULATE TOOL TOTALS                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="5" name="Calculate Tool Totals">
+    <description>Aggregate costs by tool to show where budget is concentrated.</description>
+    <actions>
+      <action>Group all scene costs by tool name</action>
+      <action>
+        For each tool, compute:
+        - total_calls: sum of call_count across all scenes using this tool
+        - total_cost: sum of scene_cost across all scenes using this tool
+        - percentage_of_total: (total_cost / base_total) * 100
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 6: CALCULATE RETAKE BUFFER                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="6" name="Calculate Retake Buffer">
+    <description>Apply the retake budget percentage from global.yaml to the base estimate.</description>
+    <actions>
+      <action>base_total = sum of all scene_cost values</action>
+      <action>retake_buffer = base_total * (retake_budget_percent / 100)</action>
+      <action>estimated_total = base_total + retake_buffer</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 7: GENERATE RESOLUTION ALTERNATIVES                          -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="7" name="Resolution Alternatives">
+    <description>Recalculate the full estimate at each resolution tier to show cost comparison.</description>
+    <actions>
+      <action>
+        For each resolution tier in [draft, standard, hd, 4k]:
+          1. Recalculate all scene costs using that tier's pricing
+          2. If a tool/model does not support a tier, mark as "N/A" for that tier
+          3. Compute: alt_base = sum of recalculated scene costs
+          4. Compute: alt_retake_buffer = alt_base * (retake_budget_percent / 100)
+          5. Compute: alt_total = alt_base + alt_retake_buffer
+          6. Compute: savings_vs_current = estimated_total - alt_total
+          7. Store: {tier, base_cost, retake_buffer, total, savings_vs_current}
+      </action>
+      <action>Present as a comparison table showing the cost at each tier</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 8: WRITE ESTIMATE FILE                                       -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="8" name="Write Estimate File">
+    <description>Write the structured cost estimate to the output path.</description>
+    <actions>
+      <action>Ensure _cost/estimates/ directory exists (create if needed)</action>
+      <action>Write {episode_id}-estimate.yaml with the schema below</action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- OUTPUT SCHEMA                                                     -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <output_schema>
+    <![CDATA[
+# {episode_id}-estimate.yaml
+# Auto-generated by cost-estimate task (T2)
+
+episode_id: "{episode_id}"
+episode_title: "{episode_title}"
+generated_at: "{ISO-8601 timestamp}"
+ssd_source: "episodes/{episode_id}/ssd/scene-spec.yaml"
+pricing_source: "_config/pricing.yaml"
+resolution_profile: "{active_resolution_profile}"
+veo_model: "{veo_model}"
+retake_budget_percent: {int}
+
+summary:
+  total_scenes: {int}
+  total_duration_seconds: {float}
+  base_cost: {float}
+  retake_buffer: {float}
+  estimated_total: {float}
+  currency: "USD"
+
+per_scene_breakdown:
+  - scene_id: "{scene_id}"
+    title: "{scene_title}"
+    tool: "{tool_name}"
+    model: "{model_name}"
+    resolution: "{resolution}"
+    duration_seconds: {float}
+    call_count: {int}
+    cost_per_unit: {float}
+    scene_cost: {float}
+
+tool_totals:
+  - tool: "{tool_name}"
+    total_calls: {int}
+    total_cost: {float}
+    percentage_of_total: {float}
+
+retake_buffer:
+  percent: {int}
+  amount: {float}
+
+resolution_alternatives:
+  - tier: "draft"
+    base_cost: {float}
+    retake_buffer: {float}
+    total: {float}
+    savings_vs_current: {float}
+  - tier: "standard"
+    base_cost: {float}
+    retake_buffer: {float}
+    total: {float}
+    savings_vs_current: {float}
+  - tier: "hd"
+    base_cost: {float}
+    retake_buffer: {float}
+    total: {float}
+    savings_vs_current: {float}
+  - tier: "4k"
+    base_cost: {float}
+    retake_buffer: {float}
+    total: {float}
+    savings_vs_current: {float}
+
+warnings: []
+    ]]>
+  </output_schema>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ERROR HANDLING                                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <error_handling>
+    <error condition="SSD file not found">
+      <action>HALT: "Scene specification not found at episodes/{episode_id}/ssd/scene-spec.yaml. Run /cookie-create-ssd first."</action>
+    </error>
+    <error condition="pricing.yaml not found">
+      <action>HALT: "Pricing configuration not found at _config/pricing.yaml. This file is required for cost estimation."</action>
+    </error>
+    <error condition="global.yaml not found">
+      <action>WARN: "global.yaml not found. Using default retake_budget_percent of 20%."</action>
+    </error>
+    <error condition="Tool not in pricing table">
+      <action>WARN: "Tool '{tool}' not found in pricing.yaml. Cost set to $0.00 with warning annotation."</action>
+    </error>
+    <error condition="Invalid SSD structure">
+      <action>HALT: "SSD has structural issues: {details}. Run /cookie-validate-ssd first."</action>
+    </error>
+  </error_handling>
+
+</task>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>create-character-sheet</workflow>
+    <description>Create character identity with prompt tokens and voice config</description>
+    <agent>character-designer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="receive_character_description">
+      <action>Receive the character description from the user or script. Capture: name, role, personality traits, physical appearance, age range, distinguishing features, and any specific visual or voice requirements. If referencing an existing character for modification, load that character's current identity.json.</action>
+      <output>Character description brief</output>
+    </step>
+
+    <step id="2" name="load_schema_and_defaults">
+      <action>Load the character identity schema from {project-root}/_cookie/schemas/character-identity.schema.json. Load default values from {project-root}/_cookie/_config/character-defaults.yaml. These provide the required field structure and sensible fallback values for optional fields.</action>
+      <output>Schema definition and default values loaded</output>
+    </step>
+
+    <step id="3" name="create_identity_json">
+      <action>Create the identity.json file following the schema. Populate: id (kebab-case slug), name, role, description, personality array, physical_description object (height, build, skin_tone, hair, eyes, distinguishing_features), age_range, and metadata (created_at, version, status).</action>
+      <output>Core identity.json structure</output>
+    </step>
+
+    <step id="4" name="define_prompt_tokens">
+      <action>Define the prompt_tokens object with: core_identity (a concise, front-loadable description for AI generation prompts, max 50 tokens), style_modifiers (array of style-specific tokens), negative_tokens (what this character should never look like), and consistency_anchors (key visual elements that must remain consistent across all generations). Core identity tokens must be descriptive enough to generate recognizable, consistent results.</action>
+      <output>Complete prompt_tokens configuration</output>
+    </step>
+
+    <step id="5" name="define_voice_config">
+      <action>Define the voice configuration: voice_type (narration, dialogue, both, none), provider (elevenlabs, system), voice_id (ElevenLabs voice ID if applicable), voice_settings (stability, similarity_boost, style, speed), speaking_style (conversational, dramatic, instructional), and voice_description (natural language description for reference). Skip if character has no speaking role.</action>
+      <output>Complete voice configuration object</output>
+    </step>
+
+    <step id="6" name="set_active_style_and_outfit">
+      <action>Define at least one style entry with: style_id, style_name, description, and outfit entries. Each outfit includes: outfit_id, outfit_name, description, and prompt_tokens specific to the outfit. Set one style and outfit as active_style and active_outfit respectively.</action>
+      <output>Style and outfit configuration</output>
+    </step>
+
+    <step id="7" name="create_directory_structure">
+      <action>Create the character directory structure: characters/{char-id}/identity.json, characters/{char-id}/voice-config.json, characters/{char-id}/styles/{style-id}/ (for reference images to be generated later). Ensure the directory naming follows kebab-case convention.</action>
+      <output>Character directory structure</output>
+    </step>
+
+    <step id="8" name="save_identity_and_voice">
+      <action>Save the complete identity.json to characters/{char-id}/identity.json. Save the voice configuration to characters/{char-id}/voice-config.json. Both files must validate against their respective schemas.</action>
+      <output>Saved identity.json and voice-config.json files</output>
+    </step>
+
+    <step id="9" name="validate_with_t7">
+      <action>Run the T7 character validation task against the newly created character. Verify: schema compliance, required field completeness, prompt token quality (descriptive enough for consistent generation), voice config completeness, and directory structure correctness. Fix any validation errors before proceeding.</action>
+      <output>T7 validation report (pass/fail with details)</output>
+    </step>
+
+    <step id="10" name="mark_ready_for_references">
+      <action>Update the character's status to "pending-references" indicating that the identity is defined but reference images have not yet been generated. The generate-character-refs workflow will pick up characters in this status.</action>
+      <output>Character status updated, ready for reference image generation</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>identity.json validates against the character identity schema</gate>
+    <gate>All required fields are present and populated</gate>
+    <gate>prompt_tokens.core_identity is descriptive enough for consistent AI generation</gate>
+    <gate>Voice config is complete if the character has a speaking role</gate>
+    <gate>T7 validation passes without errors</gate>
+    <gate>Directory structure follows the expected convention</gate>
+  </quality-gates>
+</instructions>

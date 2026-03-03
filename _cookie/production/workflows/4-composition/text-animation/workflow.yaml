@@ -1,0 +1,34 @@
+name: text-animation
+workflow_id: text-animation
+module: production
+agent: motion-designer
+slash_command: /production-text-animation
+description: "Create animated text overlays, titles, and subtitles within the Remotion composition"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/4-composition/text-animation"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/remotion/SKILL.md"
+  - "{project-root}/_cookie/skills/shared/typography-standards.md"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  style_guide:
+    path: "{project-root}/episodes/{episode_id}/style/style-guide.yaml"
+    load_strategy: "FULL_LOAD"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "text_overlays_created == true"
+    - check: "animations_configured == true"
+    - check: "timing_matches_ssd == true"
+    - check: "subtitles_generated_if_enabled == true"
+    - check: "readability_validated == true"

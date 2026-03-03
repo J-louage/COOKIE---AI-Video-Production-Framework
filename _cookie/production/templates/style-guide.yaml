@@ -1,0 +1,41 @@
+# COOKIE Style Guide Template
+# Defines the visual identity for an episode or project.
+# Referenced by SSD global_style.style_guide
+
+style_name: ""
+description: ""
+
+color_palette:
+  primary: ""                   # Hex color, e.g., "#1A2B3C"
+  secondary: ""
+  accent: ""
+  background: ""
+  text: ""
+  additional: []                # Extra colors if needed
+
+typography:
+  heading_font: ""              # e.g., "Inter"
+  heading_weight: 700
+  body_font: ""                 # e.g., "Inter"
+  body_weight: 400
+  caption_font: ""              # e.g., "Inter"
+  caption_weight: 300
+
+cinematic_style: ""             # e.g., "warm cinematic, shallow DOF, film grain"
+lighting_preference: ""         # e.g., "golden hour, warm key light"
+camera_style: ""                # e.g., "slow dolly movements, medium shots"
+
+# VEO/Nano Banana style tokens injected into all prompts
+style_tokens: ""                # e.g., "cinematic, warm color palette, shallow depth of field, 24fps"
+
+# Negative prompts added globally
+negative_prompts:
+  - "blurry"
+  - "low quality"
+  - "watermark"
+  - "text overlay"
+  - "distorted"
+
+# Brand integration
+brand_logo_usage: ""            # When and how to show logo
+brand_colors_enforcement: ""    # How strictly brand colors must be followed

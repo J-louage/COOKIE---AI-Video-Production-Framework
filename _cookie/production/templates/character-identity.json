@@ -1,0 +1,40 @@
+{
+  "character_id": "",
+  "name": "",
+  "role": "",
+  "type": "visual-voice",
+  "description": "",
+
+  "physical": {
+    "height": "",
+    "build": "",
+    "hair": "",
+    "eyes": "",
+    "skin_tone": "",
+    "age_range": "",
+    "distinguishing_features": []
+  },
+
+  "prompt_tokens": {
+    "core_identity": "",
+    "negative": "",
+    "veo_specific": "",
+    "nano_banana_specific": ""
+  },
+
+  "voice": {
+    "elevenlabs_voice_id": "",
+    "stability": 0.65,
+    "clarity": 0.78,
+    "style": 0.45,
+    "speaking_style": "",
+    "language": "English"
+  },
+
+  "active_style": "realistic",
+  "active_outfit": "",
+  "available_styles": ["realistic"],
+  "available_outfits": {
+    "realistic": []
+  }
+}

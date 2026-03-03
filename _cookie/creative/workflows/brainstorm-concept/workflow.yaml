@@ -1,0 +1,23 @@
+name: brainstorm-concept
+workflow_id: brainstorm-concept
+module: creative
+agent: creative-director
+slash_command: /creative-brainstorm-concept
+description: "Brainstorm 3-5 distinct video concepts from a brief or topic"
+config_source: "{project-root}/_cookie/creative/config.yaml"
+installed_path: "{project-root}/_cookie/creative/workflows/brainstorm-concept"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/color-theory.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "concepts_generated >= 3"
+    - check: "each_concept_has_pros_cons == true"
+    - check: "concept_selected == true"

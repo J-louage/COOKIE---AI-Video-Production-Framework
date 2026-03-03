@@ -1,0 +1,64 @@
+name: social-square
+description: >
+  Square-format video template for Instagram Feed, Facebook, and LinkedIn posts.
+  Features mandatory hook in the first 1.5 s, always-on captions, CTA overlay
+  at end, and center-crop framing. Optimized for feed-scroll engagement on
+  platforms where square video maximizes screen real estate.
+
+format: social-square
+aspect_ratio: "1:1"
+
+defaults:
+  fps: 30
+  width: 1080
+  height: 1080
+  min_duration_seconds: 15
+  max_duration_seconds: 60
+
+transitions:
+  default: fade-in
+  supported:
+    - fade-in
+    - fade-out
+    - cross-dissolve
+    - wipe-left
+    - wipe-right
+  default_duration_frames: 8
+
+supported_overlays:
+  - title-card
+  - text-overlay
+  - caption-tiktok
+  - progress-bar
+  - lower-third
+
+hook_required: true
+hook_duration: 1.5s
+captions_always_on: true
+cta_at_end: true
+cta_position: overlay
+cta_max_duration: 3
+progress_bar: optional
+
+text_density: high
+
+scenes:
+  min: 1
+  max: 8
+  structure:
+    - type: hook
+      required: true
+      duration_seconds: 1.5
+      suggested_overlay: text-overlay
+      notes: >
+        Must grab attention immediately. Bold text, fast cuts, or a provocative
+        question. Critical for stopping the scroll in feed-based platforms.
+    - type: body
+      recommended_duration_seconds: 10-45
+      suggested_overlay: caption-tiktok
+    - type: cta
+      required: true
+      recommended_duration_seconds: 3-8
+      suggested_overlay: text-overlay
+      notes: >
+        Call-to-action overlay: follow, like, link in bio, learn more, etc.

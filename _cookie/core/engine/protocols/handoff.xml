@@ -1,0 +1,455 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Framework — Protocol: Handoff
+  Machine-readable workflow output for downstream consumption.
+
+  When a workflow completes (or fails), this protocol produces a
+  structured YAML handoff document that the Director can parse to
+  route the next workflow, aggregate results, or report to the user.
+-->
+<protocol id="handoff" version="1.0">
+
+  <metadata>
+    <name>Handoff</name>
+    <description>
+      Produces a structured, machine-readable output document at the end
+      of every workflow execution. This document enables the Director to
+      chain workflows together, track cumulative costs, propagate errors,
+      and suggest next actions. The handoff format is YAML for readability
+      and ease of parsing by both humans and downstream workflows.
+    </description>
+    <triggers>
+      <trigger>When a workflow completes successfully.</trigger>
+      <trigger>When a workflow fails and cannot recover.</trigger>
+      <trigger>When a workflow completes partially (some steps succeeded, others failed).</trigger>
+    </triggers>
+    <consumers>
+      <consumer>The Director (workflow router and orchestrator).</consumer>
+      <consumer>Downstream workflows that depend on this workflow's outputs.</consumer>
+      <consumer>The cost tracking system for cumulative budget monitoring.</consumer>
+      <consumer>The user-facing status dashboard.</consumer>
+    </consumers>
+  </metadata>
+
+  <!-- ================================================================
+       SECTION 1: HANDOFF OUTPUT FORMAT
+       ================================================================ -->
+  <output_format type="yaml">
+    <description>
+      The canonical handoff document structure. Every workflow execution
+      produces exactly one handoff document in this format.
+    </description>
+
+    <schema>
+      <!--
+        Top-level fields of the handoff YAML document.
+        Example output shown in Section 3.
+      -->
+
+      <field name="workflow_id" type="string" required="true">
+        <description>
+          Unique identifier for this workflow execution instance.
+          Format: `{workflow_name}-{timestamp}-{short_hash}`
+          Example: `generate-episode-20260301T143022-a7f3`
+        </description>
+      </field>
+
+      <field name="workflow_name" type="string" required="true">
+        <description>
+          The name of the workflow that was executed.
+          Example: `generate-episode`, `build-character-refs`, `render-scene`
+        </description>
+      </field>
+
+      <field name="status" type="enum" required="true">
+        <description>
+          The final status of the workflow execution.
+        </description>
+        <values>
+          <value name="success">
+            All steps completed without errors. All outputs are available.
+          </value>
+          <value name="failed">
+            The workflow encountered an unrecoverable error and halted.
+            Some outputs may be missing. The `errors` array contains details.
+          </value>
+          <value name="partial">
+            Some steps completed successfully but others failed or were skipped.
+            The `outputs` array indicates which outputs are available.
+            The `errors` array indicates which steps failed.
+          </value>
+        </values>
+      </field>
+
+      <field name="started_at" type="string" required="true">
+        <description>ISO 8601 timestamp of when the workflow began execution.</description>
+      </field>
+
+      <field name="completed_at" type="string" required="true">
+        <description>ISO 8601 timestamp of when the workflow finished (success, fail, or partial).</description>
+      </field>
+
+      <field name="duration_seconds" type="number" required="true">
+        <description>Total wall-clock time for the workflow execution in seconds.</description>
+      </field>
+
+      <field name="outputs" type="array" required="true">
+        <description>
+          List of all outputs produced by the workflow. Each output entry
+          identifies what was produced, where it is stored, and its status.
+        </description>
+        <item_schema>
+          <field name="name" type="string">Logical name of the output (e.g., `scene_03_video`, `character_ref_sheet`).</field>
+          <field name="type" type="string">MIME type or asset category (e.g., `video/mp4`, `image/png`, `text/yaml`).</field>
+          <field name="path" type="string">Absolute path to the output file on disk.</field>
+          <field name="status" type="enum">
+            <value>available</value>
+            <value>missing</value>
+            <value>failed</value>
+          </field>
+          <field name="produced_by_step" type="string">The step ID that generated this output.</field>
+          <field name="checksum" type="string">SHA-256 hash of the output file for integrity verification.</field>
+          <field name="size_bytes" type="number">File size in bytes.</field>
+          <field name="metadata" type="object">
+            Additional output-specific metadata (resolution, duration, frame count, etc.).
+          </field>
+        </item_schema>
+      </field>
+
+      <field name="errors" type="array" required="true">
+        <description>
+          List of all errors encountered during execution. Empty array if
+          status is `success`. Each error entry provides enough detail for
+          diagnosis and potential automated recovery.
+        </description>
+        <item_schema>
+          <field name="error_type" type="string">
+            Error classification matching error-recovery.xml types:
+            missing_file, unresolved_variable, validation_failure,
+            api_failure, cost_exceeded, asset_quality_fail.
+          </field>
+          <field name="step_id" type="string">The workflow step where the error occurred.</field>
+          <field name="message" type="string">Human-readable error description.</field>
+          <field name="details" type="object">Structured error details for automated processing.</field>
+          <field name="recovery_attempted" type="boolean">Whether error recovery was attempted.</field>
+          <field name="recovery_result" type="string">Outcome of recovery attempt: resolved, failed, skipped.</field>
+          <field name="timestamp" type="string">ISO 8601 timestamp of when the error occurred.</field>
+        </item_schema>
+      </field>
+
+      <field name="cost_summary" type="object" required="true">
+        <description>
+          Breakdown of all costs incurred during workflow execution.
+          Used by the Director for cumulative budget tracking and by the
+          cost-gate protocol for threshold monitoring.
+        </description>
+        <sub_fields>
+          <field name="total_cost_usd" type="number">Total cost in USD for this workflow run.</field>
+          <field name="breakdown_by_step" type="array">
+            <item_schema>
+              <field name="step_id" type="string">Step identifier.</field>
+              <field name="tool" type="string">The tool or API used (e.g., gpt-4o, dall-e-3, runway-gen4).</field>
+              <field name="cost_usd" type="number">Cost incurred by this step.</field>
+              <field name="units" type="string">Unit of consumption (tokens, images, seconds).</field>
+              <field name="quantity" type="number">How many units were consumed.</field>
+            </item_schema>
+          </field>
+          <field name="breakdown_by_tool" type="object">
+            Aggregated cost per tool across all steps. Keys are tool names,
+            values are total cost in USD for that tool.
+          </field>
+          <field name="cumulative_session_cost_usd" type="number">
+            Running total of all costs in the current production session
+            (across all workflows since the session started).
+          </field>
+          <field name="budget_remaining_usd" type="number">
+            Remaining budget based on the configured budget limit.
+            Null if no budget limit is configured.
+          </field>
+          <field name="retake_buffer_used" type="boolean">
+            Whether any retake buffer was consumed during this workflow.
+          </field>
+        </sub_fields>
+      </field>
+
+      <field name="next_suggested" type="object" required="false">
+        <description>
+          Suggestion for the Director on what workflow to run next.
+          Based on the workflow's own knowledge of the production pipeline.
+          The Director may override this suggestion.
+        </description>
+        <sub_fields>
+          <field name="workflow_name" type="string">Name of the suggested next workflow.</field>
+          <field name="reason" type="string">Why this workflow is suggested next.</field>
+          <field name="params" type="object">
+            Suggested parameters to pass to the next workflow,
+            typically derived from this workflow's outputs.
+          </field>
+          <field name="priority" type="enum">
+            <value>required</value>
+            <value>recommended</value>
+            <value>optional</value>
+          </field>
+          <field name="blocking" type="boolean">
+            Whether this suggestion blocks other workflows from running.
+            If true, the Director should run this next before anything else.
+          </field>
+        </sub_fields>
+      </field>
+
+      <field name="context_carry" type="object" required="false">
+        <description>
+          Key-value pairs from the workflow context that should be carried
+          forward to downstream workflows. This is the mechanism for passing
+          state between chained workflows without relying on file I/O.
+        </description>
+      </field>
+
+    </schema>
+  </output_format>
+
+  <!-- ================================================================
+       SECTION 2: HANDOFF GENERATION PROCEDURE
+       ================================================================ -->
+  <procedure>
+    <description>
+      Steps the workflow engine follows to generate the handoff document
+      at the conclusion of a workflow.
+    </description>
+
+    <step order="1">
+      <name>Determine Final Status</name>
+      <action>
+        Evaluate all step results:
+        - If all steps passed → status = "success"
+        - If any step failed and was not recovered → check if other steps succeeded:
+          - If some succeeded → status = "partial"
+          - If none succeeded or the failure was in a critical path → status = "failed"
+      </action>
+    </step>
+
+    <step order="2">
+      <name>Collect Outputs</name>
+      <action>
+        Iterate through all steps that declared outputs. For each output:
+        - Verify the output file exists on disk.
+        - Compute the checksum.
+        - Record the file size.
+        - Set status to "available" if it exists, "missing" if the step was
+          skipped, or "failed" if the step errored.
+      </action>
+    </step>
+
+    <step order="3">
+      <name>Collect Errors</name>
+      <action>
+        Aggregate all errors from the workflow execution log. For each error:
+        - Classify it according to error-recovery.xml types.
+        - Include the recovery attempt result if recovery was tried.
+        - Preserve the full error detail for debugging.
+      </action>
+    </step>
+
+    <step order="4">
+      <name>Calculate Cost Summary</name>
+      <action>
+        Sum all cost entries recorded during step execution.
+        Break down by step, by tool, and compute the cumulative session total.
+        Check remaining budget against the configured limit.
+      </action>
+    </step>
+
+    <step order="5">
+      <name>Determine Next Suggestion</name>
+      <action>
+        Based on the workflow definition's `on_complete` block:
+        - If status is "success" → use the `on_success.next` declaration.
+        - If status is "partial" → use `on_partial.next` if defined, else suggest re-running failed steps.
+        - If status is "failed" → use `on_failure.next` if defined, else suggest manual intervention.
+        Populate the params from the current workflow's outputs and context.
+      </action>
+    </step>
+
+    <step order="6">
+      <name>Build Context Carry</name>
+      <action>
+        Extract variables from the workflow context that are marked with
+        `carry_forward: true` in the workflow definition. Include them
+        in the context_carry field for downstream consumption.
+      </action>
+    </step>
+
+    <step order="7">
+      <name>Write Handoff Document</name>
+      <action>
+        Serialize the complete handoff structure to YAML. Write it to:
+        `{episode_path}/.cookie/handoffs/{workflow_id}.yaml`
+        Also store it in the workflow context for immediate Director consumption.
+      </action>
+    </step>
+
+    <step order="8">
+      <name>Signal Director</name>
+      <action>
+        Emit a `workflow.completed` event with the handoff document
+        attached. The Director receives this event and proceeds with
+        routing based on the handoff contents.
+      </action>
+    </step>
+  </procedure>
+
+  <!-- ================================================================
+       SECTION 3: EXAMPLE HANDOFF DOCUMENT
+       ================================================================ -->
+  <example>
+    <description>Example handoff document for a completed scene rendering workflow.</description>
+    <yaml_content><![CDATA[
+workflow_id: "render-scene-20260301T143022-a7f3"
+workflow_name: "render-scene"
+status: "success"
+started_at: "2026-03-01T14:30:22Z"
+completed_at: "2026-03-01T14:35:47Z"
+duration_seconds: 325
+
+outputs:
+  - name: "scene_03_video"
+    type: "video/mp4"
+    path: "/projects/my-series/episodes/ep01/output/scenes/scene-03.mp4"
+    status: "available"
+    produced_by_step: "merge-video"
+    checksum: "sha256:a1b2c3d4e5f6..."
+    size_bytes: 15728640
+    metadata:
+      resolution: "1920x1080"
+      duration_seconds: 12.5
+      fps: 24
+      codec: "h264"
+
+  - name: "scene_03_narration"
+    type: "audio/mp3"
+    path: "/projects/my-series/episodes/ep01/output/audio/scene-03-narration.mp3"
+    status: "available"
+    produced_by_step: "generate-narration"
+    checksum: "sha256:f6e5d4c3b2a1..."
+    size_bytes: 524288
+    metadata:
+      duration_seconds: 12.5
+      sample_rate: 44100
+
+errors: []
+
+cost_summary:
+  total_cost_usd: 2.35
+  breakdown_by_step:
+    - step_id: "generate-frames"
+      tool: "dall-e-3"
+      cost_usd: 1.20
+      units: "images"
+      quantity: 3
+    - step_id: "generate-video"
+      tool: "runway-gen4"
+      cost_usd: 0.80
+      units: "seconds"
+      quantity: 12
+    - step_id: "generate-narration"
+      tool: "elevenlabs"
+      cost_usd: 0.35
+      units: "characters"
+      quantity: 450
+  breakdown_by_tool:
+    dall-e-3: 1.20
+    runway-gen4: 0.80
+    elevenlabs: 0.35
+  cumulative_session_cost_usd: 14.80
+  budget_remaining_usd: 35.20
+  retake_buffer_used: false
+
+next_suggested:
+  workflow_name: "render-scene"
+  reason: "Next scene in sequence (scene 04 of 8)"
+  params:
+    episode_id: "ep01"
+    scene_id: "04"
+  priority: "required"
+  blocking: false
+
+context_carry:
+  episode_id: "ep01"
+  scenes_completed: ["01", "02", "03"]
+  scenes_remaining: ["04", "05", "06", "07", "08"]
+  cumulative_cost: 14.80
+]]></yaml_content>
+  </example>
+
+  <!-- ================================================================
+       SECTION 4: PARSEABILITY REQUIREMENTS
+       ================================================================ -->
+  <parseability>
+    <description>
+      Requirements for ensuring the handoff document is reliably
+      parseable by downstream consumers.
+    </description>
+
+    <requirements>
+      <requirement>
+        The handoff YAML must be valid YAML 1.2. No YAML aliases or anchors
+        are permitted to ensure flat, self-contained documents.
+      </requirement>
+      <requirement>
+        All string values that could be confused with YAML types (true, false,
+        null, numbers) must be explicitly quoted.
+      </requirement>
+      <requirement>
+        All file paths must be absolute. No relative paths are permitted
+        in the handoff document.
+      </requirement>
+      <requirement>
+        The `errors` array must always be present, even if empty.
+        Downstream consumers must not need to null-check this field.
+      </requirement>
+      <requirement>
+        The `outputs` array must always be present, even if empty.
+      </requirement>
+      <requirement>
+        The `cost_summary` object must always be present with at minimum
+        `total_cost_usd` set (0.0 if no costs were incurred).
+      </requirement>
+      <requirement>
+        Timestamps must always be in UTC with the `Z` suffix. No local
+        time offsets are permitted.
+      </requirement>
+      <requirement>
+        The handoff document must not exceed 1MB in size. If output metadata
+        is large, reference external files rather than inlining content.
+      </requirement>
+    </requirements>
+  </parseability>
+
+  <!-- ================================================================
+       SECTION 5: RETENTION AND CLEANUP
+       ================================================================ -->
+  <retention>
+    <description>
+      Rules for how long handoff documents are retained and when they
+      can be cleaned up.
+    </description>
+    <rules>
+      <rule name="default_retention">
+        Handoff documents are retained for 30 days after creation.
+      </rule>
+      <rule name="failed_retention">
+        Handoff documents for failed workflows are retained for 90 days
+        to support post-mortem analysis.
+      </rule>
+      <rule name="cleanup_trigger">
+        Cleanup is triggered by the `cleanup-handoffs` maintenance workflow
+        or manually by the user via the Director.
+      </rule>
+      <rule name="archival">
+        Before deletion, handoff documents are archived to a compressed
+        log at `{project-root}/.cookie/handoff-archive.log.gz`.
+      </rule>
+    </rules>
+  </retention>
+
+</protocol>

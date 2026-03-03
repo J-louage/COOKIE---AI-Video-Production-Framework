@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>audio-sync</workflow>
+    <description>Synchronize narration, music, and SFX audio tracks with precise timing and level management</description>
+    <agent>motion-designer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_ssd_audio_config">
+      <action>Load the SSD audio configuration including narration segments with start/end timestamps, music track references with volume levels, SFX entries with trigger timestamps, and global audio settings (sample rate, bit depth, target loudness). Verify all referenced audio files exist on disk.</action>
+      <output>Validated audio configuration with confirmed file paths</output>
+    </step>
+
+    <step id="2" name="map_narration_to_frames">
+      <action>Convert narration timestamps from the SSD into frame numbers based on the project FPS. Create Audio components for each narration segment, setting startFrom and endAt frame values. Verify narration segments do not overlap with each other. Ensure narration aligns with the corresponding scene boundaries.</action>
+      <output>Narration Audio components mapped to frame-accurate positions</output>
+    </step>
+
+    <step id="3" name="set_music_volume_curves">
+      <action>Configure music volume automation curves. Set baseline music volume from the SSD config. Apply ducking (volume reduction) during narration segments: ramp down over 0.3s before narration starts, hold at ducked level during narration, ramp back up over 0.5s after narration ends. Use Remotion interpolate() for smooth volume transitions. Duck level should reduce music by 12-18dB below narration.</action>
+      <output>Music volume curves with ducking applied under all narration</output>
+    </step>
+
+    <step id="4" name="place_sfx_at_timestamps">
+      <action>Place each SFX audio clip at its designated timestamp from the SSD. Convert timestamps to frame positions. Set individual SFX volume levels as specified. Verify SFX clips do not mask narration. Layer multiple SFX clips where they overlap, ensuring combined levels stay within headroom.</action>
+      <output>All SFX clips placed at correct frame positions</output>
+    </step>
+
+    <step id="5" name="build_audio_mix">
+      <action>Combine all audio layers (narration, music, SFX) into the final mix structure within the Remotion Composition. Order audio layers with narration on top, SFX in the middle, and music at the base. Verify the combined audio does not clip (peak above 0dBFS). Apply a limiter if peaks exceed -1dBFS to prevent distortion.</action>
+      <output>Complete audio mix with all layers combined</output>
+    </step>
+
+    <step id="6" name="validate_levels">
+      <action>Measure the integrated loudness of the audio mix. Target level is -14 LUFS (standard for online video platforms). Verify true peak does not exceed -1dBTP. Check loudness range (LRA) stays within 7-15 LU. If levels are out of spec, adjust the master gain and re-validate. Generate a loudness report with measurements.</action>
+      <output>Loudness validation report confirming -14 LUFS target</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All narration segments mapped to correct frame positions</gate>
+    <gate>Narration segments do not overlap with each other</gate>
+    <gate>Music ducking applied under all narration with smooth ramps</gate>
+    <gate>All SFX placed at correct timestamps from the SSD</gate>
+    <gate>Combined audio mix does not clip above -1dBFS</gate>
+    <gate>Integrated loudness measures -14 LUFS (within 1 LU tolerance)</gate>
+    <gate>True peak does not exceed -1dBTP</gate>
+    <gate>Loudness range stays within 7-15 LU</gate>
+  </quality-gates>
+</instructions>

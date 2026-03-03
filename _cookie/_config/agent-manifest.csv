@@ -1,0 +1,14 @@
+agent_id,name,module,file_path,role,priority,tools,memory_path
+director,Christy,core,core/agents/director.md,Master Orchestrator & Director,P0,All,_memory/director-sidecar/
+producer,Max,core,core/agents/producer.md,Producer & Cost Tracker,P0,None,
+screenwriter,Nora,production,production/agents/screenwriter.md,Screenwriter,P0,shared/prompt-engineering,_memory/screenwriter-sidecar/
+storyboard-artist,Luca,production,production/agents/storyboard-artist.md,Storyboard Artist,P0,"veo,nano-banana,image-editing,shared/aspect-ratio-guide",
+character-designer,Iris,production,production/agents/character-designer.md,Character Designer,P0,"nano-banana,image-editing",_memory/character-designer-sidecar/
+prompt-engineer,Zara,production,production/agents/prompt-engineer.md,Prompt Engineer,P0,"veo,nano-banana,shared/prompt-engineering",_memory/prompt-engineer-sidecar/
+cinematographer,Orion,production,production/agents/cinematographer.md,Cinematographer,P0,"veo,nano-banana,image-editing",_memory/cinematographer-sidecar/
+voice-director,Celeste,production,production/agents/voice-director.md,Voice Director,P0,elevenlabs,
+demo-producer,Kai,production,production/agents/demo-producer.md,Demo Producer,P1,"playwright,image-editing",
+sound-designer,Reed,production,production/agents/sound-designer.md,Sound Designer,P1,"ffmpeg,shared/audio-mixing",
+motion-designer,Felix,composition,composition/agents/motion-designer.md,Motion Designer,P0,"remotion,shared/typography-standards",
+editor,Ava,composition,composition/agents/editor.md,Editor & QA Lead,P0,"remotion,ffmpeg,image-editing,shared/aspect-ratio-guide",_memory/editor-sidecar/
+creative-director,Nova,creative,creative/agents/creative-director.md,Creative Director,P1,image-editing,_memory/creative-director-sidecar/

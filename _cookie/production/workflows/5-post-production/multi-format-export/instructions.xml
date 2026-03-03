@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>multi-format-export</workflow>
+    <description>Export the final video in multiple formats and aspect ratios for different platforms</description>
+    <agent>editor</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_format_exports_list">
+      <action>Load the format_exports list from the SSD or project configuration. Each format entry specifies: platform name, target resolution, aspect ratio, crop strategy (center-crop, letterbox, pillarbox, or smart-crop), caption requirements, encoding preset, and maximum file size. Common formats include YouTube (16:9), Instagram Reels (9:16), TikTok (9:16), Instagram Square (1:1), and Twitter/X (16:9). Verify the final render source file exists.</action>
+      <output>Validated format exports list with all platform specifications</output>
+    </step>
+
+    <step id="2" name="apply_crop_strategy">
+      <action>For each format, apply the specified crop strategy to convert from the source aspect ratio to the target aspect ratio. Center-crop: crop equal amounts from opposing edges. Smart-crop: analyze key visual areas per scene and crop to preserve the most important content. Letterbox: add black bars top/bottom. Pillarbox: add black bars left/right. Use FFmpeg crop and pad filters. Verify no critical visual content is lost in cropped versions.</action>
+      <output>Cropped video streams for each target aspect ratio</output>
+    </step>
+
+    <step id="3" name="scale_to_target_resolution">
+      <action>Scale each cropped video to the target resolution using FFmpeg scale filter with lanczos algorithm for high-quality downscaling. Common target resolutions: YouTube 1920x1080, Instagram Reels 1080x1920, TikTok 1080x1920, Instagram Square 1080x1080. Verify the scaled output has the exact target resolution with no sub-pixel rounding errors.</action>
+      <output>Scaled video files at target resolutions</output>
+    </step>
+
+    <step id="4" name="add_captions_if_needed">
+      <action>For formats that require burned-in captions (typically short-form vertical formats like TikTok and Reels), overlay subtitle text directly onto the video using FFmpeg subtitles filter or drawtext filter. Use the generated SRT or VTT file as the caption source. Style captions according to platform best practices (large font, high contrast, centered). Verify captions are readable and properly timed.</action>
+      <output>Videos with burned-in captions where required</output>
+    </step>
+
+    <step id="5" name="apply_encoding_preset">
+      <action>Apply platform-specific encoding presets for each format. Configure bitrate, codec profile (baseline, main, high), level, audio codec (AAC), audio bitrate, and container format (mp4). Respect maximum file size limits per platform. If the output exceeds the size limit, reduce bitrate and re-encode. Use two-pass encoding for formats with strict size constraints.</action>
+      <output>Encoded video files with platform-specific settings</output>
+    </step>
+
+    <step id="6" name="render_and_save">
+      <action>Execute the FFmpeg render pipeline for each format. Save outputs to episodes/{episode_id}/exports/formats/{platform-name}/{episode_id}-{platform}-{timestamp}.mp4. Create a format manifest for each export containing: platform, resolution, aspect ratio, codec, bitrate, file size, and duration. Verify all exports are complete and no formats were skipped.</action>
+      <output>All format exports saved with manifests</output>
+    </step>
+
+    <step id="7" name="log_cost">
+      <action>Log the multi-format export operation. While no API costs are incurred (local compute only), record the processing time and output file sizes in the episode actuals log for tracking purposes.</action>
+      <output>Export operation logged in episode actuals</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All formats from the format_exports list are processed</gate>
+    <gate>Crop strategy applied correctly for each aspect ratio conversion</gate>
+    <gate>No critical visual content lost in cropped versions</gate>
+    <gate>Scaled outputs match target resolutions exactly</gate>
+    <gate>Burned-in captions applied where required and properly timed</gate>
+    <gate>Encoding presets match platform specifications</gate>
+    <gate>File sizes within platform limits</gate>
+    <gate>Format manifest created for each export</gate>
+  </quality-gates>
+</instructions>

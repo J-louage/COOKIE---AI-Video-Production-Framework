@@ -1,0 +1,26 @@
+name: quick-social
+workflow_id: quick-social
+module: production
+agent: director
+slash_command: /production-quick-social
+description: "Rapid social media clip generation for TikTok, Reels, and Shorts"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/quick-flow/quick-social"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/veo/SKILL.md"
+  - "{project-root}/_cookie/skills/remotion/SKILL.md"
+  - "{project-root}/_cookie/skills/ffmpeg/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "video_rendered_9_16 == true"
+    - check: "captions_added == true"
+    - check: "hook_present == true"
+    - check: "cost_logged == true"

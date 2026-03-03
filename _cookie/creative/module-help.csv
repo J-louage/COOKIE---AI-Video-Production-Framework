@@ -1,0 +1,5 @@
+command,description,agent,phase
+cookie-creative,Activate Creative Director (Nova),creative-director,creative
+cookie-brainstorm,Brainstorm video concepts from brief,creative-director,creative
+cookie-moodboard,Create visual moodboard for episode,creative-director + character-designer,creative
+cookie-brand-review,Review video against brand guidelines,creative-director,creative

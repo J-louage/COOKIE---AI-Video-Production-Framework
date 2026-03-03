@@ -1,0 +1,312 @@
+# ElevenLabs Voice Catalog
+# ========================
+# Pre-cataloged voices with recommended settings for common use cases.
+# These are ElevenLabs stock voices available on all plans.
+#
+# To use a voice: reference the `id` field in your API calls or character identity.json.
+# The `recommended_settings` are tested starting points — adjust per your content needs.
+# See voice-config-guide.md for parameter tuning details.
+#
+# Voice availability may change. Verify with GET /v1/voices if a voice returns 404.
+# Last verified: 2025-05-01
+
+voices:
+  - id: "pNInz6obpgDQGcFmaJgB"
+    name: "Adam"
+    gender: "male"
+    age: "middle-aged"
+    accent: "American"
+    description: "Deep, resonant male voice with a warm, professional quality. Versatile across many use cases. One of the most popular ElevenLabs voices."
+    use_case: "narration, professional, corporate"
+    best_for:
+      - Corporate videos
+      - Documentary narration
+      - Product explainers
+      - Brand content
+    avoid_for:
+      - Young/energetic characters
+      - Children's content
+    recommended_settings:
+      stability: 0.65
+      clarity: 0.78
+      style: 0.45
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+  - id: "21m00Tcm4TlvDq8ikWAM"
+    name: "Rachel"
+    gender: "female"
+    age: "young-adult"
+    accent: "American"
+    description: "Warm, conversational female voice with natural inflections. Feels approachable and trustworthy. Excellent for building rapport with audiences."
+    use_case: "narration, warm, conversational"
+    best_for:
+      - Podcast-style narration
+      - Tutorial content
+      - Health and wellness
+      - Conversational explainers
+    avoid_for:
+      - Authoritative/commanding tone
+      - High-energy content
+    recommended_settings:
+      stability: 0.60
+      clarity: 0.75
+      style: 0.50
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+  - id: "EXAVITQu4vr4xnSDxMaL"
+    name: "Bella"
+    gender: "female"
+    age: "young-adult"
+    accent: "American"
+    description: "Bright, energetic young female voice. Natural enthusiasm without sounding forced. Perfect for content targeting younger demographics."
+    use_case: "social media, energetic, youthful"
+    best_for:
+      - Social media content
+      - TikTok/Reels narration
+      - Lifestyle brands
+      - Product unboxing style
+    avoid_for:
+      - Serious/formal content
+      - Corporate presentations
+      - Meditation/calm content
+    recommended_settings:
+      stability: 0.45
+      clarity: 0.70
+      style: 0.65
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+  - id: "ErXwobaYiN019PkySvjV"
+    name: "Antoni"
+    gender: "male"
+    age: "young-adult"
+    accent: "American"
+    description: "Friendly, approachable male voice with a natural cadence. Feels like a knowledgeable friend explaining something. Clear articulation."
+    use_case: "explainer, friendly, approachable"
+    best_for:
+      - How-to videos
+      - Educational content
+      - App walkthroughs
+      - FAQ narration
+    avoid_for:
+      - Dramatic storytelling
+      - Luxury brand content
+    recommended_settings:
+      stability: 0.55
+      clarity: 0.75
+      style: 0.50
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+  - id: "VR6AewLTigWG4xSOukaG"
+    name: "Arnold"
+    gender: "male"
+    age: "middle-aged"
+    accent: "American"
+    description: "Deep, authoritative male voice with gravitas. Commanding presence without being intimidating. Excellent for content that needs weight and credibility."
+    use_case: "documentary, authoritative, deep"
+    best_for:
+      - Documentary narration
+      - Historical content
+      - Science and nature
+      - Trailer voiceovers
+    avoid_for:
+      - Casual/friendly content
+      - Children's content
+      - Comedy
+    recommended_settings:
+      stability: 0.70
+      clarity: 0.80
+      style: 0.40
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+  - id: "MF3mGyEYCl7XYWbV9V6O"
+    name: "Emily"
+    gender: "female"
+    age: "middle-aged"
+    accent: "American"
+    description: "Calm, soothing female voice with a gentle quality. Steady pacing with warmth. Creates a sense of trust and serenity."
+    use_case: "calm, soothing, meditation"
+    best_for:
+      - Meditation guides
+      - Sleep stories
+      - Wellness content
+      - Gentle tutorials
+      - Ambient narration
+    avoid_for:
+      - High-energy content
+      - Action/excitement
+      - Comedy
+    recommended_settings:
+      stability: 0.75
+      clarity: 0.80
+      style: 0.30
+      use_speaker_boost: false
+    model_id: "eleven_multilingual_v2"
+
+  - id: "TxGEqnHWrfWFTfGW9XjX"
+    name: "Josh"
+    gender: "male"
+    age: "young-adult"
+    accent: "American"
+    description: "Dynamic, engaging male voice with storytelling flair. Natural dramatic range makes it ideal for narrative content. Good emotional range."
+    use_case: "storytelling, dynamic, engaging"
+    best_for:
+      - Story narration
+      - Fiction audiobooks
+      - Adventure content
+      - Gaming narration
+      - Character-driven content
+    avoid_for:
+      - Formal corporate content
+      - Technical documentation
+    recommended_settings:
+      stability: 0.50
+      clarity: 0.75
+      style: 0.55
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+  - id: "yoZ06aMxZJJ28mfd3POQ"
+    name: "Sam"
+    gender: "male"
+    age: "young-adult"
+    accent: "American"
+    description: "Casual, relatable male voice. Feels natural and unforced, like a real person talking. Low-key delivery that works well for authentic content."
+    use_case: "casual, relatable, tutorial"
+    best_for:
+      - Tutorial content
+      - Coding walkthroughs
+      - Casual vlogs
+      - Review content
+      - Tech explainers
+    avoid_for:
+      - Premium brand content
+      - Dramatic narration
+      - Formal presentations
+    recommended_settings:
+      stability: 0.55
+      clarity: 0.70
+      style: 0.45
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+  - id: "jBpfuIE2acCO8z3wKNLl"
+    name: "Gigi"
+    gender: "female"
+    age: "young"
+    accent: "American"
+    description: "Playful, bright female voice with youthful energy. Animated delivery that brings text to life. Slightly higher pitch with natural enthusiasm."
+    use_case: "animation, playful, bright"
+    best_for:
+      - Animation narration
+      - Children's content
+      - Playful brand voices
+      - Character dialogue (young characters)
+      - Gaming content
+    avoid_for:
+      - Serious/professional content
+      - Corporate communications
+      - Somber or emotional scenes
+    recommended_settings:
+      stability: 0.40
+      clarity: 0.65
+      style: 0.70
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+  - id: "onwK4e9ZLuTAKqWW03F9"
+    name: "Daniel"
+    gender: "male"
+    age: "middle-aged"
+    accent: "British"
+    description: "Sophisticated, refined British male voice. Polished delivery with natural elegance. Conveys intelligence, quality, and understated authority."
+    use_case: "luxury brand, sophisticated, refined"
+    best_for:
+      - Luxury brand content
+      - Premium product showcases
+      - Travel and hospitality
+      - Wine/food/lifestyle
+      - British character dialogue
+    avoid_for:
+      - Casual/informal content
+      - American-audience-specific content where accent matters
+      - Youth-focused content
+    recommended_settings:
+      stability: 0.70
+      clarity: 0.82
+      style: 0.50
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+  - id: "2EiwWnXFnvU5JabPnv8n"
+    name: "Clyde"
+    gender: "male"
+    age: "middle-aged"
+    accent: "American"
+    description: "Strong, confident male voice with a slightly rough texture. Feels authentic and grounded. Good for content that needs a rugged, real quality."
+    use_case: "rugged, confident, authentic"
+    best_for:
+      - Outdoor/adventure brands
+      - Automotive content
+      - Sports narration
+      - Action trailers
+    avoid_for:
+      - Gentle/soft content
+      - Children's content
+      - Academic content
+    recommended_settings:
+      stability: 0.55
+      clarity: 0.72
+      style: 0.50
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+  - id: "XB0fDUnXU5powFXDhCwa"
+    name: "Charlotte"
+    gender: "female"
+    age: "middle-aged"
+    accent: "British (Scandinavian undertone)"
+    description: "Elegant, measured female voice with European sophistication. Clear enunciation with a gentle, authoritative quality. Versatile across formal and creative content."
+    use_case: "elegant, measured, sophisticated"
+    best_for:
+      - Fashion and beauty
+      - Art and culture
+      - European brand content
+      - Audiobook narration
+    avoid_for:
+      - Casual social media
+      - High-energy content
+    recommended_settings:
+      stability: 0.65
+      clarity: 0.78
+      style: 0.45
+      use_speaker_boost: true
+    model_id: "eleven_multilingual_v2"
+
+# ---
+# Custom Voices
+# ---
+# To add custom/cloned voices to this catalog, use the following template:
+#
+#   - id: "your_custom_voice_id"
+#     name: "Voice Name"
+#     gender: "male|female|non-binary"
+#     age: "young|young-adult|middle-aged|senior"
+#     accent: "Accent description"
+#     description: "Detailed description of the voice quality and character."
+#     use_case: "primary, use, cases"
+#     custom: true
+#     cloned_from: "Source description (e.g., 'Brand spokesperson recording session 2024-03')"
+#     best_for:
+#       - Specific use case 1
+#       - Specific use case 2
+#     recommended_settings:
+#       stability: 0.60
+#       clarity: 0.80
+#       style: 0.40
+#       use_speaker_boost: true
+#     model_id: "eleven_multilingual_v2"

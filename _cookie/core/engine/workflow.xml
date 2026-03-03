@@ -1,0 +1,1544 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Framework — Workflow Execution Engine
+  Version: 1.0.0
+  Location: _cookie/core/engine/workflow.xml
+
+  PURPOSE:
+    This file is the CORE RUNTIME for the COOKIE framework. It instructs Claude Code
+    on HOW to execute any workflow.yaml file. Every slash command that triggers a workflow
+    loads this file first, then processes the target workflow.yaml through the rules defined here.
+
+  THIS IS NOT CODE. It is an XML meta-prompt — a structured instruction document that defines
+  the execution protocol, tag semantics, mode behavior, error handling, and quality enforcement
+  for every workflow in the COOKIE video production pipeline.
+
+  RELATIONSHIP:
+    - workflow.xml (this file) defines HOW to execute
+    - workflow.yaml files define WHAT to execute
+    - protocols/*.xml define reusable sub-procedures invoked by this engine
+    - error-recovery.xml defines error handler patterns referenced by this engine
+
+  LOADING ORDER (enforced by slash commands):
+    1. Claude Code loads this file (workflow.xml)
+    2. Reads entire contents — this IS the operating system
+    3. Receives a workflow.yaml path as 'workflow-config'
+    4. Follows these instructions EXACTLY
+-->
+
+<!-- ════════════════════════════════════════════════════════════════════════════
+     SECTION 1: ENGINE IDENTITY AND CONSTANTS
+     ════════════════════════════════════════════════════════════════════════════ -->
+
+<engine id="cookie-workflow-engine" version="1.0.0" framework="COOKIE">
+  <identity>
+    <name>COOKIE Workflow Execution Engine</name>
+    <description>
+      Cinematic Output Orchestration with Kinetic Intelligence Engine.
+      Parses workflow.yaml configurations, resolves inheritance, loads skills JIT,
+      executes steps sequentially with conditional logic, enforces quality gates,
+      manages cost tracking, and supports three execution modes with mid-workflow toggling.
+    </description>
+  </identity>
+
+  <constants>
+    <framework-root description="Auto-detected project root containing _cookie/">{project-root}</framework-root>
+    <engine-path>{project-root}/_cookie/core/engine</engine-path>
+    <protocols-path>{project-root}/_cookie/core/engine/protocols</protocols-path>
+    <global-config>{project-root}/_cookie/_config/global.yaml</global-config>
+    <pricing-config>{project-root}/_cookie/_config/pricing.yaml</pricing-config>
+    <resolution-profiles>{project-root}/_cookie/_config/resolution-profiles.yaml</resolution-profiles>
+    <format-presets>{project-root}/_cookie/_config/format-presets.yaml</format-presets>
+    <cost-estimates-dir>{project-root}/_cookie/_cost/estimates</cost-estimates-dir>
+    <cost-actuals-dir>{project-root}/_cookie/_cost/actuals</cost-actuals-dir>
+    <cost-reports-dir>{project-root}/_cookie/_cost/reports</cost-reports-dir>
+    <memory-root>{project-root}/_cookie/_memory</memory-root>
+    <characters-root>{project-root}/characters</characters-root>
+    <shared-assets-root>{project-root}/shared-assets</shared-assets-root>
+    <episodes-root>{project-root}/episodes</episodes-root>
+  </constants>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════════
+       SECTION 2: EXECUTION MODES
+       ════════════════════════════════════════════════════════════════════════════ -->
+
+  <execution-modes>
+
+    <mode id="normal" default="true">
+      <description>
+        Full interactive mode. The user is consulted at every decision point.
+        - template-output blocks are displayed and WAIT for user review/approval
+        - cost-gate blocks present estimates and REQUIRE explicit user approval
+        - ask blocks are presented and WAIT for user response
+        - Quality gate failures HALT execution and present the failure to the user
+        - The user may provide feedback, request changes, or approve at each checkpoint
+      </description>
+      <rules>
+        <rule>DISPLAY every template-output and WAIT for user acknowledgment before proceeding</rule>
+        <rule>PRESENT cost-gate estimates and REQUIRE explicit "approved" / "proceed" / "yes" before spending</rule>
+        <rule>ASK every ask block and WAIT for user response</rule>
+        <rule>HALT on quality gate failure and present failure details</rule>
+        <rule>CONFIRM before any destructive action (overwriting files, deleting assets)</rule>
+        <rule>SHOW progress after each step completion: "[Step X/N complete] description"</rule>
+      </rules>
+    </mode>
+
+    <mode id="yolo">
+      <description>
+        Autonomous execution mode. Confirmations are skipped, but cost gates remain active.
+        Use when the user trusts the pipeline and wants fast throughput without being asked
+        at every checkpoint — but still wants budget protection.
+        - template-output blocks are displayed but execution proceeds WITHOUT waiting
+        - ask blocks use sensible defaults or skip if optional
+        - Quality gates still enforce: failures still HALT
+        - COST GATES STILL REQUIRE APPROVAL (this is the key difference from yolo-uncapped)
+      </description>
+      <rules>
+        <rule>DISPLAY template-output but proceed immediately without waiting</rule>
+        <rule>SKIP ask blocks — use default values if available, skip if optional, HALT if required and no default</rule>
+        <rule>COST GATES STILL ACTIVE — present estimate and REQUIRE approval before any API spending</rule>
+        <rule>Quality gate failures still HALT execution</rule>
+        <rule>Destructive actions proceed without confirmation (but log what was done)</rule>
+        <rule>SHOW progress with compact format: "[X/N] description ... done"</rule>
+        <rule>At the end of each major phase, show a brief summary of what was auto-decided</rule>
+      </rules>
+    </mode>
+
+    <mode id="yolo-uncapped">
+      <description>
+        Full autonomous execution with NO cost gates. Everything runs without stopping.
+        This mode requires EXPLICIT opt-in — it cannot be activated by accident.
+        Use only when the user has pre-approved the budget and wants zero interruptions.
+        - All confirmations skipped
+        - All cost gates skipped (but costs are STILL TRACKED and LOGGED)
+        - Quality gate failures still HALT (safety is never disabled)
+      </description>
+      <rules>
+        <rule>SKIP all template-output confirmations — display and proceed</rule>
+        <rule>SKIP all ask blocks — use defaults or skip</rule>
+        <rule>SKIP cost gates — but STILL LOG every cost to _cost/actuals/</rule>
+        <rule>Quality gate failures still HALT execution — safety is non-negotiable</rule>
+        <rule>WARN once at activation: "YOLO-UNCAPPED active. All cost gates disabled. Costs are still logged."</rule>
+        <rule>Show running cost total after every API call: "[$X.XX spent so far]"</rule>
+      </rules>
+      <activation-requirement>
+        User must explicitly say one of: "yolo uncapped", "yolo-uncapped", "skip all cost gates",
+        "no budget limits", or equivalent. A simple "yolo" activates yolo mode, NOT yolo-uncapped.
+      </activation-requirement>
+    </mode>
+
+    <!-- ── YOLO Toggle Protocol ── -->
+
+    <yolo-toggle>
+      <description>
+        The user can switch execution modes at ANY point during workflow execution.
+        Mode changes take effect IMMEDIATELY — the current step completes under the old mode,
+        and the NEXT step uses the new mode.
+      </description>
+
+      <trigger-phrases>
+        <to-yolo>
+          "yolo", "go yolo", "auto mode", "skip confirmations", "just do it", "autonomous mode"
+        </to-yolo>
+        <to-yolo-uncapped>
+          "yolo uncapped", "yolo-uncapped", "no cost gates", "skip all gates",
+          "no budget limits", "full auto"
+        </to-yolo-uncapped>
+        <to-normal>
+          "stop yolo", "back to normal", "interactive mode", "ask me again",
+          "pause", "slow down", "I want to review"
+        </to-normal>
+      </trigger-phrases>
+
+      <on-toggle>
+        <action>Acknowledge the mode change: "Switching to {new_mode} mode."</action>
+        <action>If switching TO yolo-uncapped, warn: "Cost gates are now disabled. All spending will proceed without approval. Costs are still tracked."</action>
+        <action>If switching FROM yolo-uncapped to normal, confirm: "Cost gates re-enabled. I will ask for approval before any API spending."</action>
+        <action>Log the mode change with timestamp in the workflow execution context</action>
+        <action>Continue execution from the NEXT step under the new mode</action>
+      </on-toggle>
+    </yolo-toggle>
+
+  </execution-modes>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════════
+       SECTION 3: WORKFLOW INITIALIZATION
+       ════════════════════════════════════════════════════════════════════════════ -->
+
+  <initialization>
+
+    <step n="INIT-1" name="Detect Project Root">
+      <action>
+        Identify the project root directory. The project root is the directory that contains
+        the `_cookie/` folder. Walk upward from the current working directory until `_cookie/`
+        is found. Store this as {project-root}.
+      </action>
+      <on-error type="missing_file">
+        HALT: Cannot find _cookie/ directory. This does not appear to be a COOKIE project.
+        Suggest: "Run /cookie-help to set up a new project, or navigate to a directory containing _cookie/."
+      </on-error>
+    </step>
+
+    <step n="INIT-2" name="Parse Workflow Config">
+      <description>
+        Load and parse the workflow.yaml file passed as 'workflow-config'.
+        This file defines what the workflow does — its steps, required skills,
+        error handling, quality gates, cost tracking, and input patterns.
+      </description>
+      <action>Read the workflow.yaml file at the provided path</action>
+      <action>Parse all YAML fields into the workflow execution context</action>
+      <action>Store the workflow name, description, and installed_path for logging</action>
+    </step>
+
+    <step n="INIT-3" name="Resolve Config Inheritance">
+      <description>
+        COOKIE uses a three-level configuration inheritance chain:
+          global.yaml --> module config.yaml --> episode-config.yaml (if applicable)
+        Later values override earlier ones. This step resolves the full merged config.
+      </description>
+      <action>
+        Load {project-root}/_cookie/_config/global.yaml as the BASE configuration.
+      </action>
+      <action>
+        Read the workflow.yaml `config_source` field. Load the referenced module config.yaml.
+        Merge its values ON TOP of global.yaml (module values override global values).
+      </action>
+      <action>
+        If the workflow operates on an episode (has `episode_id` or `episode_path` in context),
+        check for {episodes-root}/{episode_id}/episode-config.yaml.
+        If it exists, load it and merge its `overrides` ON TOP of the module config.
+        Episode-level overrides take highest priority.
+      </action>
+      <action>
+        Resolve all {variable} placeholders in the merged config:
+        - {project-root} --> detected project root
+        - {episode_id} --> current episode ID (from context or ask user)
+        - {episode_path} --> {episodes-root}/{episode_id}-{slug}/
+        - {config_source} --> resolved module config path
+        - {installed_path} --> workflow's own directory
+        - {date} --> current date (system-generated, ISO 8601)
+        - {user_name} --> from merged config
+        - {communication_language} --> from merged config
+        - {document_output_language} --> from merged config
+        - {resolution_profile} --> from merged config (default: "standard")
+      </action>
+      <check if="any {variable} placeholder remains unresolved in critical fields">
+        <on-fail>
+          Invoke preflight-check protocol to identify all unresolved variables.
+          If the unresolved variable has a sensible default, use it.
+          If it requires user input, ASK (respecting execution mode).
+          If it cannot be resolved, trigger on_error.unresolved_variable --> HALT.
+        </on-fail>
+      </check>
+    </step>
+
+    <step n="INIT-4" name="Load Required Skills (JIT)">
+      <description>
+        Skills are tool-specific knowledge files (SKILL.md, prompt guides, constraints, presets)
+        that give the executing agent expertise in using VEO, Nano Banana, ElevenLabs, etc.
+        They are loaded Just-In-Time — only when the workflow declares them as required.
+      </description>
+      <action>
+        Read the `required_skills` array from workflow.yaml.
+        For each skill path:
+          1. Resolve the path (replace {project-root} etc.)
+          2. Verify the file exists
+          3. Load the SKILL.md file into context
+          4. If the skill directory contains additional files referenced by SKILL.md
+             (e.g., model-constraints.yaml, prompt-patterns.md), note them as available
+             for on-demand loading during execution — do NOT load all supplementary files now.
+      </action>
+      <action>
+        For shared skills (e.g., shared/prompt-engineering.md), load them alongside
+        tool-specific skills. Shared skills provide cross-cutting knowledge.
+      </action>
+      <on-error type="missing_file">
+        WARN: Skill file not found at {path}. The workflow may not execute correctly.
+        In normal mode: ASK user whether to continue without the skill or provide an alternate path.
+        In yolo mode: Continue with a warning logged.
+      </on-error>
+    </step>
+
+    <step n="INIT-5" name="Discover Input Files">
+      <description>
+        Load the input files that this workflow needs to operate on.
+        Uses the discover-inputs protocol with three loading strategies.
+      </description>
+      <invoke-protocol name="discover-inputs">
+        <input>workflow.yaml `input_file_patterns` section</input>
+        <strategies>
+          <strategy name="FULL_LOAD">
+            Read the entire file into context. Use for small-to-medium files
+            that the workflow needs complete access to (e.g., scene-spec.yaml, scripts).
+          </strategy>
+          <strategy name="SELECTIVE_LOAD">
+            Load only specific sections or keys from the file. Use for large files
+            where only certain parts are relevant (e.g., specific scene from a large SSD).
+          </strategy>
+          <strategy name="INDEX_GUIDED">
+            Read the directory listing first, then load specific files as needed during execution.
+            Use for directories with many files (e.g., characters/, assets/).
+          </strategy>
+        </strategies>
+      </invoke-protocol>
+      <action>
+        For each entry in `input_file_patterns`:
+          1. Resolve the path pattern
+          2. Apply the declared `load_strategy`
+          3. Handle `ref:` prefixed paths by resolving them relative to {project-root}
+          4. If a required input file is missing, trigger on_error.missing_file
+      </action>
+    </step>
+
+    <step n="INIT-6" name="Enforce Pre-Start Quality Gates">
+      <description>
+        Before any workflow logic executes, validate all pre_start quality gates.
+        These are preconditions that MUST be true before the workflow can proceed.
+        Examples: "SSD must be validated", "cost estimate must be approved",
+        "character sheets must exist".
+      </description>
+      <action>
+        Read the `quality_gates.pre_start` array from workflow.yaml.
+        For each gate:
+          1. Evaluate the `check` condition against the current context
+          2. If the check PASSES, continue to next gate
+          3. If the check FAILS, execute the `on_fail` action (typically HALT with message)
+      </action>
+      <gate type="pre_start">
+        <on-pass>All pre-start gates passed. Proceeding to workflow execution.</on-pass>
+        <on-fail>
+          HALT workflow execution. Display:
+          "Pre-start gate failed: {gate.on_fail}"
+          "Resolve this condition before running this workflow."
+          If the gate failure suggests a prerequisite workflow (e.g., "SSD must be validated"
+          implies running validate-ssd), suggest that workflow to the user.
+        </on-fail>
+      </gate>
+    </step>
+
+    <step n="INIT-7" name="Initialize Cost Tracking">
+      <description>
+        Set up cost tracking for this workflow execution. Every API call that costs money
+        must be logged to the actuals file.
+      </description>
+      <action>
+        Read `cost_tracking` from workflow.yaml.
+        Resolve the `log_to` path for the actuals file.
+        Load `pricing_source` (pricing.yaml) into context for cost calculations.
+      </action>
+      <action>
+        If the actuals file already exists (workflow is being resumed or re-run),
+        load the existing running_total to continue tracking from where it left off.
+        If it does not exist, initialize a new actuals tracking structure with:
+          - episode_id
+          - tracking_started: current timestamp
+          - transactions: []
+          - running_total: { spent: 0.00, budget_status: "on-track" }
+      </action>
+      <action>
+        Load the cost estimate for this episode (if it exists) from _cost/estimates/.
+        This provides the budget baseline for threshold alerts.
+      </action>
+    </step>
+
+    <step n="INIT-8" name="Announce Workflow Start">
+      <template-output critical="true">
+        <format>
+          ── COOKIE Workflow Engine ──────────────────────────────
+          Workflow:   {workflow.name}
+          Episode:    {episode_id} (if applicable, otherwise "N/A")
+          Mode:       {current_execution_mode}
+          Skills:     {loaded_skills_list}
+          ─────────────────────────────────────────────────────────
+          {workflow.description}
+          ─────────────────────────────────────────────────────────
+        </format>
+      </template-output>
+    </step>
+
+  </initialization>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════════
+       SECTION 4: TAG DEFINITIONS AND SEMANTICS
+       ════════════════════════════════════════════════════════════════════════════ -->
+
+  <tag-definitions>
+
+    <!-- ── 4.1 STRUCTURAL TAGS ── -->
+
+    <tag-group name="Structural">
+
+      <tag name="step" syntax='&lt;step n="X" name="Step Name"&gt;'>
+        <description>
+          A numbered execution unit. Steps execute SEQUENTIALLY in order of their `n` attribute.
+          Each step is a logical unit of work that may contain multiple actions, checks, and outputs.
+        </description>
+        <attributes>
+          <attr name="n" required="true">Step number. Determines execution order. Can be integer or string (e.g., "3a").</attr>
+          <attr name="name" required="false">Human-readable step name for logging and progress display.</attr>
+          <attr name="optional" required="false" default="false">
+            If "true", the step can be skipped without halting the workflow.
+            In normal mode: ASK user whether to execute or skip.
+            In yolo mode: Execute unless there is a reason to skip (missing inputs, etc.).
+          </attr>
+          <attr name="if" required="false">
+            Conditional execution. The step ONLY executes if the condition evaluates to true.
+            Conditions can reference:
+            - Workflow context variables: if="episode_id exists"
+            - Previous step outputs: if="step_3_output.status == 'success'"
+            - Config values: if="resolution_profile == 'hd'"
+            - File existence: if="file_exists('{episode_path}/ssd/scene-spec.yaml')"
+            - Boolean flags: if="ssd_validated == true"
+          </attr>
+        </attributes>
+        <execution-rules>
+          <rule>Display step progress: "[Step {n}/{total}] {name}"</rule>
+          <rule>If the step has if="condition" and the condition is FALSE, skip with: "[Step {n} skipped: condition not met]"</rule>
+          <rule>If the step has optional="true" and execution is not possible, skip with: "[Step {n} skipped: optional, prerequisites not met]"</rule>
+          <rule>Each step's outputs are added to the workflow context for subsequent steps</rule>
+        </execution-rules>
+      </tag>
+
+      <tag name="for-each" syntax='&lt;for-each collection="items" as="item"&gt;'>
+        <description>
+          Iterates over a collection, executing the contained block once per item.
+          Used for processing multiple scenes, characters, formats, etc.
+        </description>
+        <attributes>
+          <attr name="collection" required="true">
+            The collection to iterate over. Can be:
+            - A YAML array from the workflow context (e.g., "ssd.scenes")
+            - A directory listing (e.g., "characters/*")
+            - A computed list from a previous step
+          </attr>
+          <attr name="as" required="true">
+            The loop variable name. Available inside the block as {as_name}.
+            Example: as="scene" makes {scene.id}, {scene.duration}, etc. available.
+          </attr>
+        </attributes>
+        <execution-rules>
+          <rule>Before the loop, announce: "Processing {collection.length} items..."</rule>
+          <rule>For each iteration, set the loop variable in context</rule>
+          <rule>Display progress: "[{current}/{total}] Processing {item_identifier}..."</rule>
+          <rule>If an iteration fails and on_error is "continue", log the error and proceed to next item</rule>
+          <rule>If an iteration fails and on_error is "halt", stop the loop and halt the workflow</rule>
+          <rule>After the loop, summarize: "{success_count}/{total} items processed successfully"</rule>
+        </execution-rules>
+      </tag>
+
+      <tag name="repeat" syntax='&lt;repeat count="N"&gt; or &lt;repeat until="condition"&gt;'>
+        <description>
+          Repeats the contained block a fixed number of times or until a condition is met.
+          Used for retry logic, iterative refinement, and convergence loops.
+        </description>
+        <attributes>
+          <attr name="count" required="false">Fixed number of repetitions.</attr>
+          <attr name="until" required="false">
+            Condition that terminates the loop when TRUE.
+            Evaluated after each iteration.
+          </attr>
+          <attr name="max" required="false" default="10">
+            Safety limit — maximum iterations regardless of until condition.
+            Prevents infinite loops.
+          </attr>
+        </attributes>
+        <execution-rules>
+          <rule>If both count and until are specified, stop at whichever comes first</rule>
+          <rule>If max iterations reached without until condition being met, WARN and exit loop</rule>
+          <rule>Track iteration count in context as {repeat.iteration}</rule>
+        </execution-rules>
+      </tag>
+
+    </tag-group>
+
+    <!-- ── 4.2 EXECUTION TAGS ── -->
+
+    <tag-group name="Execution">
+
+      <tag name="action" syntax="&lt;action&gt;instruction text&lt;/action&gt;">
+        <description>
+          A single executable instruction. The primary unit of work within a step.
+          Claude Code reads the instruction and performs it.
+        </description>
+        <attributes>
+          <attr name="if" required="false">
+            Conditional execution. Same condition syntax as step-level if.
+            When present, this specific action only executes if the condition is true.
+          </attr>
+          <attr name="critical" required="false" default="false">
+            If "true", failure of this action halts the entire workflow.
+            If "false" (default), failure is handled per on_error configuration.
+          </attr>
+        </attributes>
+        <execution-rules>
+          <rule>Execute the instruction text literally</rule>
+          <rule>Resolve any {variables} in the instruction before execution</rule>
+          <rule>If the action involves a tool/API call, apply the relevant loaded skill</rule>
+          <rule>If the action produces output, store it in the workflow context</rule>
+          <rule>If the action fails, route to the error handler based on error type</rule>
+        </execution-rules>
+      </tag>
+
+      <tag name="check" syntax='&lt;check if="condition"&gt;'>
+        <description>
+          Evaluates a condition and routes to on-pass or on-fail handlers.
+          Used for validation, assertions, and conditional branching within a step.
+        </description>
+        <children>
+          <child name="on-pass">Actions to execute if the condition is TRUE.</child>
+          <child name="on-fail">Actions to execute if the condition is FALSE.</child>
+        </children>
+        <execution-rules>
+          <rule>Evaluate the condition against the current workflow context</rule>
+          <rule>Execute the appropriate branch (on-pass or on-fail)</rule>
+          <rule>If on-fail contains "HALT:", stop workflow execution immediately</rule>
+          <rule>If on-fail contains "WARN:", log warning but continue execution</rule>
+          <rule>If on-fail contains "ASK:", present the question to the user (respecting execution mode)</rule>
+        </execution-rules>
+      </tag>
+
+      <tag name="ask" syntax='&lt;ask key="variable_name"&gt;'>
+        <description>
+          Prompts the user for input. The response is stored in the workflow context
+          under the specified key for use in subsequent steps.
+        </description>
+        <attributes>
+          <attr name="key" required="true">Variable name to store the user's response.</attr>
+          <attr name="required" required="false" default="true">
+            If "true" and the user does not provide input, re-ask (normal mode) or HALT (yolo mode).
+          </attr>
+          <attr name="default" required="false">
+            Default value used when:
+            - In yolo/yolo-uncapped mode (auto-selected)
+            - User presses enter without typing (normal mode)
+          </attr>
+          <attr name="options" required="false">
+            Comma-separated list of valid options. If provided, validate the user's response
+            against these options.
+          </attr>
+        </attributes>
+        <execution-rules>
+          <rule>In NORMAL mode: Display the question and WAIT for user response</rule>
+          <rule>In YOLO mode: Use default if available. If required and no default, HALT with message.</rule>
+          <rule>In YOLO-UNCAPPED mode: Same as YOLO.</rule>
+          <rule>Store the response in context as {key}</rule>
+          <rule>If options are specified and user response is not in the list, re-ask with valid options shown</rule>
+        </execution-rules>
+      </tag>
+
+      <tag name="goto" syntax='&lt;goto step="X"&gt;'>
+        <description>
+          Jumps execution to a different step. Use sparingly — sequential execution is preferred.
+          Primarily used for error recovery branches and conditional skip-ahead logic.
+        </description>
+        <attributes>
+          <attr name="step" required="true">Target step number to jump to.</attr>
+          <attr name="if" required="false">Condition that must be true for the jump to execute.</attr>
+        </attributes>
+        <execution-rules>
+          <rule>Resolve the target step number</rule>
+          <rule>If the target step does not exist, HALT with error</rule>
+          <rule>Jump to the target step — do NOT re-execute steps between current and target</rule>
+          <rule>Log the jump: "[goto] Jumping from step {current} to step {target}: {reason}"</rule>
+        </execution-rules>
+      </tag>
+
+      <tag name="invoke-workflow" syntax='&lt;invoke-workflow path="workflow.yaml"&gt;'>
+        <description>
+          Invokes another workflow as a sub-workflow. The current workflow PAUSES,
+          the sub-workflow executes to completion, and control returns to the invoking workflow.
+          The sub-workflow's outputs are available in the parent workflow's context.
+        </description>
+        <attributes>
+          <attr name="path" required="true">
+            Path to the workflow.yaml file to invoke. Supports {project-root} and other variables.
+          </attr>
+          <attr name="pass-context" required="false" default="true">
+            If "true", the current workflow context is passed to the sub-workflow.
+            The sub-workflow can read (but not modify) the parent's context.
+          </attr>
+          <attr name="capture-output" required="false">
+            Variable name to store the sub-workflow's output in the parent context.
+          </attr>
+        </attributes>
+        <execution-rules>
+          <rule>Resolve the workflow path</rule>
+          <rule>Initialize the sub-workflow using the SAME engine (this file)</rule>
+          <rule>The sub-workflow inherits the current execution mode (normal/yolo/yolo-uncapped)</rule>
+          <rule>The sub-workflow has its OWN step counter (does not affect parent numbering)</rule>
+          <rule>When the sub-workflow completes, capture its outputs and continue parent execution</rule>
+          <rule>If the sub-workflow HALTs with an error, the parent workflow also HALTs</rule>
+          <rule>Log: "[invoke-workflow] Starting sub-workflow: {workflow.name}"</rule>
+          <rule>On completion: "[invoke-workflow] Sub-workflow {workflow.name} completed: {status}"</rule>
+        </execution-rules>
+      </tag>
+
+      <tag name="invoke-task" syntax='&lt;invoke-task path="task-file.xml"&gt;'>
+        <description>
+          Invokes a standalone task from _cookie/core/tasks/. Tasks are simpler than workflows —
+          they are single-purpose operations that do not have their own workflow.yaml.
+          Tasks execute inline within the current step.
+        </description>
+        <attributes>
+          <attr name="path" required="true">Path to the task file (XML or MD).</attr>
+          <attr name="input" required="false">Input data to pass to the task.</attr>
+          <attr name="capture-output" required="false">Variable name for the task's output.</attr>
+        </attributes>
+        <execution-rules>
+          <rule>Load and execute the task file</rule>
+          <rule>Tasks execute within the current workflow's context (not a separate context)</rule>
+          <rule>Tasks inherit the current execution mode</rule>
+          <rule>Tasks can read the workflow context but their internal variables do not persist after completion</rule>
+          <rule>Log: "[invoke-task] Executing task: {task_name}"</rule>
+        </execution-rules>
+      </tag>
+
+      <tag name="invoke-protocol" syntax='&lt;invoke-protocol name="protocol-name"&gt;'>
+        <description>
+          Invokes a protocol from _cookie/core/engine/protocols/. Protocols are reusable
+          sub-procedures that handle cross-cutting concerns: input discovery, preflight checks,
+          handoff formatting, dependency resolution, and cost gating.
+        </description>
+        <attributes>
+          <attr name="name" required="true">
+            Protocol name. Must be one of:
+            - discover-inputs: Smart file discovery with FULL_LOAD, SELECTIVE_LOAD, INDEX_GUIDED strategies
+            - preflight-check: Validate all variables and file references before step execution
+            - handoff: Generate machine-readable workflow output for downstream consumption
+            - dependency-resolve: Build and execute asset dependency graph from SSD
+            - cost-gate: Estimate cost, present to user, require approval
+          </attr>
+          <attr name="input" required="false">Data to pass to the protocol.</attr>
+          <attr name="capture-output" required="false">Variable name for the protocol's output.</attr>
+        </attributes>
+        <execution-rules>
+          <rule>Load the protocol XML from {protocols-path}/{name}.xml</rule>
+          <rule>Execute the protocol's instructions</rule>
+          <rule>Protocols can modify the workflow context (e.g., discover-inputs adds loaded files)</rule>
+          <rule>Protocol failures are handled per the workflow's on_error configuration</rule>
+          <rule>Log: "[protocol] Invoking {name}"</rule>
+        </execution-rules>
+
+        <!-- Protocol-specific behaviors -->
+
+        <protocol name="discover-inputs">
+          <behavior>
+            For each input_file_pattern in the workflow config:
+              1. Resolve the path pattern
+              2. Detect load strategy (FULL_LOAD / SELECTIVE_LOAD / INDEX_GUIDED)
+              3. Handle ref: prefixed paths by resolving relative to {project-root}
+              4. FULL_LOAD: Read entire file content into context
+              5. SELECTIVE_LOAD: Read only specified keys/sections
+              6. INDEX_GUIDED: List directory contents, load individual files on demand
+              7. If file not found: trigger on_error.missing_file
+          </behavior>
+        </protocol>
+
+        <protocol name="preflight-check">
+          <behavior>
+            Before executing a step or block:
+              1. Scan all {variable} references in the upcoming instructions
+              2. Verify each variable is resolved in the current context
+              3. Check that all referenced file paths exist on disk
+              4. Validate that required skills for the step are loaded
+              5. If any check fails: report all failures at once (batch, not one-by-one)
+              6. Attempt auto-resolution for common cases (e.g., {date} = today)
+              7. If unresolvable variables remain: trigger on_error.unresolved_variable
+          </behavior>
+        </protocol>
+
+        <protocol name="handoff">
+          <behavior>
+            Generate a structured handoff document when a workflow completes:
+              1. Collect: workflow_id, status (success/partial/failed), completion timestamp
+              2. List all outputs produced (file paths, generated artifacts)
+              3. List any errors or warnings encountered
+              4. Include cost_summary (if cost tracking was active)
+              5. Suggest next_workflow based on the production pipeline position
+              6. Format as YAML for machine readability
+              7. This handoff is used by the Director agent to route to the next step
+          </behavior>
+        </protocol>
+
+        <protocol name="dependency-resolve">
+          <behavior>
+            Build and resolve the asset dependency graph:
+              1. Load asset-dependency-graph.yaml from the episode SSD directory
+              2. Parse all nodes (assets) and edges (dependencies)
+              3. Topological sort to determine execution order
+              4. Identify which assets can be generated in PARALLEL (no mutual dependencies)
+              5. Identify which assets must be SEQUENTIAL (dependency chain)
+              6. Return an execution plan: ordered list of parallel batches
+              7. Example: Batch 1 = [character-refs, environment-refs] (parallel),
+                 Batch 2 = [first-frames] (depends on character-refs),
+                 Batch 3 = [video-clips] (depends on first-frames)
+          </behavior>
+        </protocol>
+
+        <protocol name="cost-gate">
+          <behavior>
+            Estimate and gate costs before API spending:
+              1. Calculate the cost of the upcoming operation(s) using pricing.yaml
+              2. Look up the correct rate: tool -> model -> speed -> resolution -> per_unit_cost
+              3. Multiply by quantity (e.g., 8 seconds of video * $0.15/sec = $1.20)
+              4. Add retake buffer from global config (default 20%)
+              5. Check against thresholds:
+                 - Per-scene warn: $5.00, halt: $10.00
+                 - Cumulative warn: 80% of estimate, halt: 120% of estimate
+              6. PRESENT the cost breakdown to the user
+              7. In NORMAL mode: REQUIRE explicit approval ("approved" / "yes" / "proceed")
+              8. In YOLO mode: REQUIRE approval (cost gates are still active in yolo)
+              9. In YOLO-UNCAPPED mode: Log the estimate and PROCEED without approval
+              10. If threshold exceeded: HALT regardless of mode and present options
+                  (reduce scope, change resolution profile, increase budget, abort)
+              11. Show resolution alternatives: "At draft profile: $X, at standard: $Y, at hd: $Z, at 4k: $W"
+          </behavior>
+        </protocol>
+
+      </tag>
+
+    </tag-group>
+
+    <!-- ── 4.3 OUTPUT TAGS ── -->
+
+    <tag-group name="Output">
+
+      <tag name="template-output" syntax="&lt;template-output&gt;">
+        <description>
+          Presents formatted output to the user. This is the primary way workflows
+          communicate results, summaries, previews, and deliverables to the user.
+        </description>
+        <attributes>
+          <attr name="critical" required="false" default="false">
+            If "true", this output MUST be displayed even in yolo mode.
+            Use for final deliverables, important warnings, and error summaries.
+            Critical outputs always pause for review in normal mode.
+          </attr>
+        </attributes>
+        <children>
+          <child name="format">
+            The template string with {variables} to be resolved and displayed.
+            Supports markdown formatting for rich display.
+          </child>
+          <child name="example">
+            An example of what the output looks like when rendered.
+            Used as a reference for Claude Code to understand the expected format.
+            The example is NOT displayed to the user — it is guidance for the engine.
+          </child>
+        </children>
+        <execution-rules>
+          <rule>Resolve all {variables} in the format template</rule>
+          <rule>Display the rendered output to the user</rule>
+          <rule>In NORMAL mode: WAIT for user acknowledgment before proceeding</rule>
+          <rule>In NORMAL mode with critical="true": WAIT and explicitly ask for approval</rule>
+          <rule>In YOLO mode: Display and proceed immediately (no wait)</rule>
+          <rule>In YOLO mode with critical="true": Display and proceed, but add "[Critical output — review recommended]"</rule>
+          <rule>In YOLO-UNCAPPED mode: Same as YOLO</rule>
+        </execution-rules>
+      </tag>
+
+    </tag-group>
+
+    <!-- ── 4.4 PIPELINE TAGS ── -->
+
+    <tag-group name="Pipeline">
+
+      <tag name="parallel" syntax="&lt;parallel&gt;">
+        <description>
+          Declares a block of actions or sub-steps that can execute concurrently.
+          Used for independent asset generation tasks that do not depend on each other.
+          Example: Generating character reference images for multiple characters simultaneously,
+          or generating narration audio while video clips are being produced.
+        </description>
+        <attributes>
+          <attr name="max-concurrent" required="false" default="unbounded">
+            Maximum number of parallel tasks to run at once.
+            Use to limit API rate or manage context window size.
+          </attr>
+          <attr name="strategy" required="false" default="all">
+            - "all": All items must succeed for the block to succeed.
+            - "best-effort": Continue even if some items fail; report failures at end.
+          </attr>
+        </attributes>
+        <execution-rules>
+          <rule>
+            IMPORTANT: Claude Code is single-threaded. "Parallel" means the engine should
+            identify independent tasks and batch them for efficient execution, NOT that they
+            literally run simultaneously. The engine should:
+            1. Identify all independent tasks in the parallel block
+            2. Group them by tool/API (to batch API calls where possible)
+            3. Execute each group, proceeding to the next without waiting for user input
+               between items (even in normal mode — confirmation happens at the parallel block level)
+            4. Track individual task results
+            5. Report aggregate results at the end of the parallel block
+          </rule>
+          <rule>Cost tracking applies to EACH task individually within the parallel block</rule>
+          <rule>If strategy="all" and any task fails, the entire parallel block fails</rule>
+          <rule>If strategy="best-effort", failures are collected and reported at block end</rule>
+          <rule>Display progress: "[Parallel {current}/{total}] {task_description}"</rule>
+        </execution-rules>
+      </tag>
+
+      <tag name="on-error" syntax='&lt;on-error type="error_type"&gt;'>
+        <description>
+          Defines error handling behavior within a step or block. Overrides the workflow-level
+          on_error configuration for the scope where it appears.
+        </description>
+        <attributes>
+          <attr name="type" required="true">
+            The error type to handle. Must be one of:
+            - missing_file: A required file was not found
+            - unresolved_variable: A {variable} could not be resolved
+            - validation_failure: A quality check or validation failed
+            - api_failure: An external API call failed (VEO, Nano Banana, ElevenLabs)
+            - cost_exceeded: Spending has exceeded a threshold
+            - asset_quality_fail: Generated asset did not pass quality checks
+          </attr>
+        </attributes>
+        <error-handlers>
+
+          <handler type="missing_file" default-behavior="ask_user">
+            <action>
+              In NORMAL mode: Ask user to provide the file path, create the file, or skip.
+              In YOLO mode: If the file is optional, skip with warning. If required, HALT.
+            </action>
+          </handler>
+
+          <handler type="unresolved_variable" default-behavior="halt">
+            <action>
+              HALT workflow execution immediately.
+              Display all unresolved variables and where they are referenced.
+              Suggest: Check config inheritance chain, verify episode-config.yaml exists,
+              ensure all required context variables are set.
+            </action>
+          </handler>
+
+          <handler type="validation_failure" default-behavior="retry_once">
+            <action>
+              Retry the validation ONE time. If it fails again:
+              In NORMAL mode: Present the failure and ASK user how to proceed (fix and retry, skip, abort).
+              In YOLO mode: HALT with the validation failure details.
+            </action>
+          </handler>
+
+          <handler type="api_failure" default-behavior="retry_with_backoff">
+            <action>
+              Retry up to 3 times with exponential backoff:
+              - Attempt 1: Wait 1 second, retry
+              - Attempt 2: Wait 4 seconds, retry
+              - Attempt 3: Wait 16 seconds, retry
+              If all 3 retries fail:
+              In NORMAL mode: Present the error and ASK user (retry again, skip this item, abort).
+              In YOLO mode: Log the failure and continue to next item if possible, HALT if critical.
+              ALWAYS log the failure (including all retry attempts) to the cost actuals file
+              with status "failed" and cost 0.00 (failed calls are not billed).
+            </action>
+          </handler>
+
+          <handler type="cost_exceeded" default-behavior="halt_and_report">
+            <action>
+              HALT workflow execution immediately, regardless of execution mode.
+              Display:
+              1. Current spending total
+              2. Original budget estimate
+              3. Which threshold was exceeded (per-scene or cumulative)
+              4. Breakdown of spending so far by tool
+              5. Remaining work and estimated cost to complete
+              ASK user: "Increase budget? Reduce scope? Change resolution profile? Abort?"
+              This handler fires even in YOLO-UNCAPPED mode at the hard halt threshold (120%).
+            </action>
+          </handler>
+
+          <handler type="asset_quality_fail" default-behavior="flag_for_review">
+            <action>
+              Do NOT halt execution. Instead:
+              1. Flag the asset with status "flagged" in the asset tracking
+              2. Log the quality failure reason
+              3. Continue execution with the next asset/step
+              4. At the NEXT quality gate (per_scene or post_complete), present ALL
+                 flagged assets together for batch review
+              In NORMAL mode: Present flagged assets at the next gate and ask for retake/accept/skip decisions.
+              In YOLO mode: Auto-accept flagged assets unless they fail a critical quality criterion.
+            </action>
+          </handler>
+
+        </error-handlers>
+      </tag>
+
+      <tag name="gate" syntax='&lt;gate type="gate_type"&gt;'>
+        <description>
+          A quality checkpoint that evaluates conditions and blocks or allows execution.
+          Gates come in three types, corresponding to the quality_gates configuration:
+          - pre_start: Checked during INIT-6 before any workflow logic
+          - per_scene: Checked after each scene is processed
+          - post_complete: Checked after all workflow steps complete, before handoff
+        </description>
+        <attributes>
+          <attr name="type" required="true">Gate type: pre_start, per_scene, post_complete.</attr>
+        </attributes>
+        <execution-rules>
+          <rule>
+            Load the relevant quality_gates array from workflow.yaml for this gate type.
+            Evaluate each check condition. Collect all results before acting.
+          </rule>
+          <rule>
+            If ALL checks pass: Display "[Gate: {type}] All checks passed" and continue.
+          </rule>
+          <rule>
+            If any check FAILS:
+            - If on_fail starts with "HALT:": Stop execution, display the message.
+            - If on_fail starts with "WARN:": Log warning, display to user, continue.
+            - If on_fail starts with "ASK:": Present the question (respecting execution mode).
+          </rule>
+          <rule>
+            Per-scene gates also check for flagged assets from asset_quality_fail errors.
+            Present all flagged assets for review at this point.
+          </rule>
+        </execution-rules>
+      </tag>
+
+      <tag name="cost-gate" syntax="&lt;cost-gate&gt;">
+        <description>
+          A specialized gate that estimates the cost of upcoming work and requires approval.
+          This is a convenience tag that invokes the cost-gate protocol.
+        </description>
+        <attributes>
+          <attr name="scope" required="false" default="step">
+            What to estimate: "step" (current step only), "scene" (current scene),
+            "remaining" (all remaining work), "batch" (current parallel batch).
+          </attr>
+        </attributes>
+        <execution-rules>
+          <rule>Invoke the cost-gate protocol with the specified scope</rule>
+          <rule>Behavior depends on execution mode (see protocol definition above)</rule>
+          <rule>If the cost gate is rejected by the user, HALT with cost summary</rule>
+          <rule>If approved, log the approval timestamp and proceed</rule>
+        </execution-rules>
+      </tag>
+
+    </tag-group>
+
+  </tag-definitions>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════════
+       SECTION 5: STEP EXECUTION RUNTIME
+       ════════════════════════════════════════════════════════════════════════════ -->
+
+  <step-execution-runtime>
+
+    <description>
+      This section defines the runtime behavior for executing workflow steps.
+      After initialization (Section 3), the engine reads the instructions.xml file
+      from the workflow's installed_path and processes its steps using these rules.
+    </description>
+
+    <execution-loop>
+      <rule name="sequential-enforcement">
+        Steps execute in order of their `n` attribute. The engine MUST NOT skip ahead
+        or execute steps out of order unless explicitly directed by a goto tag.
+      </rule>
+
+      <rule name="step-lifecycle">
+        For each step, the engine follows this lifecycle:
+        1. CHECK the step's `if` condition (if present). Skip if false.
+        2. CHECK if the step is optional and its prerequisites are not met. Skip if so.
+        3. ANNOUNCE the step: "[Step {n}/{total}] {name}"
+        4. RUN preflight-check on the step's contents (resolve variables, verify files)
+        5. EXECUTE all actions, checks, and sub-blocks within the step IN ORDER
+        6. HANDLE any errors per the step's on-error or the workflow's on_error config
+        7. STORE the step's outputs in the workflow context
+        8. EVALUATE any per_scene quality gates (if this step processes a scene)
+        9. LOG the step completion: "[Step {n} complete] {summary}"
+      </rule>
+
+      <rule name="context-accumulation">
+        The workflow context is a key-value store that accumulates data as steps execute.
+        Each step can read from and write to the context. Context persists across steps
+        within a single workflow execution. Sub-workflows receive a COPY of the parent context
+        and return their outputs — they cannot modify the parent context directly.
+      </rule>
+
+      <rule name="variable-resolution-order">
+        When resolving a {variable}, check these sources in order (first match wins):
+        1. Step-local variables (set within the current step)
+        2. Workflow context (accumulated from previous steps)
+        3. Workflow.yaml fields
+        4. Episode config overrides
+        5. Module config
+        6. Global config (global.yaml)
+        7. System values (date, project-root, etc.)
+        If not found in any source: trigger on_error.unresolved_variable
+      </rule>
+
+      <rule name="save-after-each-action">
+        For actions that produce files (asset generation, document creation, exports):
+        SAVE the output file IMMEDIATELY after the action completes.
+        Do NOT batch file saves to the end of a step. This ensures that if a later action
+        fails, the earlier work is preserved.
+      </rule>
+    </execution-loop>
+
+  </step-execution-runtime>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════════
+       SECTION 6: COST TRACKING RUNTIME
+       ════════════════════════════════════════════════════════════════════════════ -->
+
+  <cost-tracking-runtime>
+
+    <description>
+      Every API call that incurs a cost MUST be tracked. This section defines the
+      cost logging protocol that runs alongside step execution.
+    </description>
+
+    <on-api-call>
+      <description>
+        This block executes AROUND every API call to a paid service (VEO, Nano Banana, ElevenLabs).
+        It runs automatically — workflow authors do not need to add explicit cost tracking.
+      </description>
+
+      <before-call>
+        <action>Calculate the expected cost from pricing.yaml</action>
+        <action>
+          Check cumulative spending against thresholds:
+          - If cumulative + expected > warn_threshold (80% of estimate): WARN
+          - If cumulative + expected > halt_threshold (120% of estimate): trigger cost_exceeded error
+        </action>
+        <action>
+          Check per-scene spending against thresholds:
+          - If scene_cost + expected > per_scene_warn ($5.00): WARN
+          - If scene_cost + expected > per_scene_halt ($10.00): trigger cost_exceeded error
+        </action>
+      </before-call>
+
+      <after-call status="success">
+        <action>
+          Log the transaction to the actuals file:
+          {
+            id: "TXN-{sequential_id}",
+            timestamp: "{ISO 8601 timestamp}",
+            scene_id: "{current_scene_id}",
+            tool: "{tool_name}",
+            operation: "{operation_type}",
+            model: "{model_used}",
+            speed: "{speed_setting}",
+            resolution: "{resolution_used}",
+            duration: {duration_if_applicable},
+            cost: {calculated_cost},
+            status: "success",
+            output: "{output_file_path}",
+            is_retake: {true/false},
+            retake_number: {N if retake},
+            retake_reason: "{reason if retake}"
+          }
+        </action>
+        <action>Update running_total.spent</action>
+        <action>
+          Recalculate running_total.estimated_remaining based on remaining work items
+        </action>
+        <action>
+          Update running_total.budget_status:
+          - "on-track" if spent is at or below the proportional estimate
+          - "over-budget" if spent exceeds the proportional estimate
+          - "critical" if spent exceeds 80% of total estimate
+        </action>
+        <action>Save the updated actuals file to disk IMMEDIATELY</action>
+        <action>
+          Display compact cost update (always, in all modes):
+          "[$X.XX] {tool}: {operation} ({scene_id}) — Total: ${running_total}"
+        </action>
+      </after-call>
+
+      <after-call status="failed">
+        <action>
+          Log the failed transaction with cost: 0.00 and status: "failed".
+          Include the error message for debugging.
+        </action>
+        <action>Route to the api_failure error handler</action>
+      </after-call>
+
+    </on-api-call>
+
+    <retake-tracking>
+      <description>
+        When an asset is regenerated (retake), track it separately from first-time generations.
+        Retakes count toward the retake budget.
+      </description>
+      <rules>
+        <rule>Mark retake transactions with is_retake: true and increment retake_number</rule>
+        <rule>Include retake_reason (e.g., "character inconsistency", "wrong camera angle")</rule>
+        <rule>Track retake count per scene against max_retakes_per_scene from global config</rule>
+        <rule>
+          When max retakes reached for a scene:
+          In NORMAL mode: ASK "Scene {scene_id} has used {count}/{max} retakes (${cost} spent).
+          Continue with another retake, accept current version, or skip this scene?"
+          In YOLO mode: Accept the current version and flag for review.
+          In YOLO-UNCAPPED mode: Continue with one more retake, then accept if still failing.
+        </rule>
+      </rules>
+    </retake-tracking>
+
+  </cost-tracking-runtime>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════════
+       SECTION 7: QUALITY GATE ENFORCEMENT
+       ════════════════════════════════════════════════════════════════════════════ -->
+
+  <quality-gate-enforcement>
+
+    <description>
+      Quality gates are checkpoints that validate work products at defined points
+      in the workflow. They are defined in the workflow.yaml under quality_gates
+      and enforced by this engine at three stages.
+    </description>
+
+    <gate-stage name="pre_start">
+      <when>During initialization (INIT-6), before any workflow steps execute.</when>
+      <behavior>
+        Evaluate ALL pre_start checks. If ANY fail with a HALT action, the workflow
+        does not start. Collect all failures and present them together — do not
+        fail on the first check and hide the rest.
+      </behavior>
+      <on-fail>
+        Display all failed pre_start gates with their on_fail messages.
+        Suggest prerequisite workflows that would satisfy the failed conditions.
+        Example: "Pre-start gate failed: SSD must be validated. Run /cookie-validate-ssd first."
+      </on-fail>
+    </gate-stage>
+
+    <gate-stage name="per_scene">
+      <when>
+        After each scene is processed within a for-each loop over scenes.
+        Also triggered at the end of each iteration in a parallel block processing scenes.
+      </when>
+      <behavior>
+        Evaluate per_scene checks for the current scene.
+        Also present any assets flagged by asset_quality_fail during this scene's processing.
+        In NORMAL mode: Present results and wait for user decision on flagged assets.
+        In YOLO mode: Auto-accept unless a critical criterion fails.
+      </behavior>
+      <on-fail>
+        For WARN actions: Log and continue.
+        For HALT actions: Stop processing further scenes. Present failure details.
+        For flagged assets: Present the list and ask for retake/accept/skip decisions.
+      </on-fail>
+    </gate-stage>
+
+    <gate-stage name="post_complete">
+      <when>After all workflow steps have completed, before generating the handoff.</when>
+      <behavior>
+        Final validation of the workflow's outputs. This is the last chance to catch issues
+        before the work is handed off to the next workflow in the pipeline.
+        Evaluate ALL post_complete checks.
+      </behavior>
+      <on-fail>
+        Display all failures. In NORMAL mode: Ask user whether to accept with warnings,
+        retry failed items, or abort. In YOLO mode: If all failures are WARNs, accept.
+        If any are HALTs, stop and report.
+      </on-fail>
+    </gate-stage>
+
+  </quality-gate-enforcement>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════════
+       SECTION 8: WORKFLOW COMPLETION AND HANDOFF
+       ════════════════════════════════════════════════════════════════════════════ -->
+
+  <workflow-completion>
+
+    <step n="FINAL-1" name="Post-Complete Quality Gate">
+      <gate type="post_complete">
+        <action>Evaluate all post_complete quality checks from workflow.yaml</action>
+        <action>Present results (see Section 7 for behavior)</action>
+      </gate>
+    </step>
+
+    <step n="FINAL-2" name="Generate Cost Summary">
+      <action if="cost_tracking is active">
+        Calculate the final cost summary for this workflow execution:
+        - Total spent during this execution
+        - Comparison to estimate (if estimate existed)
+        - Breakdown by tool
+        - Retake summary (count, cost, reasons)
+        - Budget status
+      </action>
+    </step>
+
+    <step n="FINAL-3" name="Generate Handoff">
+      <invoke-protocol name="handoff">
+        <input>
+          workflow_id: {workflow.name}
+          status: {final_status}  (success / partial / failed)
+          outputs: {list of all files created/modified}
+          errors: {list of any errors encountered}
+          warnings: {list of any warnings}
+          cost_summary: {from FINAL-2}
+          flagged_assets: {list of assets that were flagged but accepted}
+          next_suggested: {next workflow in the pipeline, if determinable}
+        </input>
+      </invoke-protocol>
+    </step>
+
+    <step n="FINAL-4" name="Update Agent Memory">
+      <action if="workflow.agent has a memory sidecar">
+        Check if the executing agent has a memory sidecar in _cookie/_memory/.
+        If so, append relevant decisions, learnings, and notes to the sidecar.
+        What to remember:
+        - Prompt patterns that produced good/bad results
+        - Configuration choices that worked well
+        - Unexpected issues and how they were resolved
+        - User preferences expressed during this workflow
+        Do NOT store: raw file contents, full API responses, cost transaction details
+        (those are in _cost/actuals/).
+      </action>
+    </step>
+
+    <step n="FINAL-5" name="Present Completion Summary">
+      <template-output critical="true">
+        <format>
+          ── Workflow Complete ──────────────────────────────────
+          Workflow:  {workflow.name}
+          Status:    {final_status}
+          Duration:  {execution_duration}
+          Mode:      {execution_mode} {mode_changes_if_any}
+
+          Outputs:
+          {for each output: "  - {output_path}"}
+
+          Cost Summary:
+            Spent:    ${total_spent}
+            Estimate: ${original_estimate} ({variance_percent})
+            Retakes:  {retake_count} (${retake_cost})
+
+          {if errors exist:}
+          Errors:
+          {for each error: "  - {error_description}"}
+
+          {if flagged_assets exist:}
+          Flagged Assets (accepted with warnings):
+          {for each flagged: "  - {asset_id}: {reason}"}
+
+          {if next_suggested:}
+          Next: {next_suggested_description}
+          Hint: Run {next_suggested_command} to continue.
+          ─────────────────────────────────────────────────────────
+        </format>
+      </template-output>
+    </step>
+
+  </workflow-completion>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════════
+       SECTION 9: SPECIAL WORKFLOW PATTERNS
+       ════════════════════════════════════════════════════════════════════════════ -->
+
+  <special-patterns>
+
+    <!-- ── 9.1 Asset Generation Pipeline ── -->
+
+    <pattern name="asset-generation-pipeline">
+      <description>
+        The standard pattern for workflows that generate assets (video clips, images, audio).
+        This pattern combines dependency resolution, parallel execution, cost gating,
+        and quality enforcement.
+      </description>
+      <template>
+        <step n="1" name="Resolve Dependencies">
+          <invoke-protocol name="dependency-resolve">
+            <input>SSD asset-dependency-graph.yaml</input>
+            <capture-output>execution_plan</capture-output>
+          </invoke-protocol>
+        </step>
+
+        <step n="2" name="Cost Gate">
+          <cost-gate scope="remaining">
+            <action>Calculate total cost for all assets to be generated</action>
+            <action>Present breakdown by scene and tool</action>
+            <action>Show resolution alternatives</action>
+            <action>Require approval (per execution mode rules)</action>
+          </cost-gate>
+        </step>
+
+        <step n="3" name="Execute Generation Batches">
+          <for-each collection="execution_plan.batches" as="batch">
+            <parallel strategy="best-effort">
+              <for-each collection="batch.assets" as="asset">
+                <action>Generate {asset} using the appropriate skill and tool</action>
+                <action>Save output immediately after generation</action>
+                <action>Log cost transaction</action>
+              </for-each>
+            </parallel>
+            <gate type="per_scene">
+              <action>Evaluate quality checks for all assets in this batch</action>
+            </gate>
+          </for-each>
+        </step>
+
+        <step n="4" name="Final Quality Check">
+          <gate type="post_complete">
+            <action>Verify all required assets were generated</action>
+            <action>Review any flagged assets</action>
+          </gate>
+        </step>
+      </template>
+    </pattern>
+
+    <!-- ── 9.2 Document Generation Pattern ── -->
+
+    <pattern name="document-generation">
+      <description>
+        Pattern for workflows that produce documents (scripts, SSDs, character sheets).
+        These workflows typically involve iterative refinement with user feedback.
+      </description>
+      <template>
+        <step n="1" name="Gather Inputs">
+          <invoke-protocol name="discover-inputs" />
+          <ask key="additional_context" required="false">
+            Any additional context or requirements?
+          </ask>
+        </step>
+
+        <step n="2" name="Generate Draft">
+          <action>Generate the initial document draft</action>
+          <template-output>
+            <format>Draft document content for review</format>
+          </template-output>
+        </step>
+
+        <step n="3" name="User Review">
+          <ask key="review_feedback" required="true" default="approved">
+            Review the draft above. Provide feedback or say "approved" to proceed.
+          </ask>
+          <check if="review_feedback != 'approved'">
+            <on-pass>
+              <goto step="2">Regenerate with feedback incorporated</goto>
+            </on-pass>
+          </check>
+        </step>
+
+        <step n="4" name="Save and Validate">
+          <action>Save the approved document</action>
+          <invoke-task path="validate task for this document type" />
+        </step>
+      </template>
+    </pattern>
+
+    <!-- ── 9.3 Multi-Format Export Pattern ── -->
+
+    <pattern name="multi-format-export">
+      <description>
+        Pattern for exporting a single production to multiple format targets
+        (16:9, 9:16, 1:1, etc.) from one SSD. Uses the format adaptation engine.
+      </description>
+      <template>
+        <step n="1" name="Identify Export Formats">
+          <action>
+            Read format_exports from episode-config.yaml.
+            For each target format, load the corresponding format preset.
+          </action>
+        </step>
+
+        <step n="2" name="Adapt and Export">
+          <for-each collection="export_formats" as="format">
+            <step n="2a" name="Adapt SSD for {format}">
+              <invoke-task path="format-adapt.xml">
+                <input>Primary SSD + {format} preset</input>
+              </invoke-task>
+            </step>
+            <step n="2b" name="Render {format}">
+              <action>Render the adapted SSD to the target format</action>
+              <action>Save to {episode_path}/exports/</action>
+            </step>
+          </for-each>
+        </step>
+      </template>
+    </pattern>
+
+    <!-- ── 9.4 Scene Continuity Pattern ── -->
+
+    <pattern name="scene-continuity">
+      <description>
+        Pattern for ensuring visual continuity between scenes using the first-frame/last-frame
+        approach. This is COOKIE's primary continuity mechanism, chosen over VEO's extension API
+        because it works at any resolution and gives explicit visual control.
+      </description>
+      <template>
+        <step n="1" name="Generate First Frame">
+          <action>
+            For the current scene, generate a first-frame image using Nano Banana.
+            The first frame must visually match the last frame of the PREVIOUS scene
+            (if this is not the first scene). Inject character reference images and
+            environment references into the prompt.
+          </action>
+        </step>
+
+        <step n="2" name="Generate Video Clip">
+          <action>
+            Generate the video clip using VEO with the first frame as the starting image.
+            Use image-to-video mode for continuity.
+          </action>
+        </step>
+
+        <step n="3" name="Extract Last Frame">
+          <action>
+            Extract the last frame from the generated video clip using FFmpeg.
+            Save as last-frame.png in the scene's assets directory.
+            This last frame becomes the continuity reference for the NEXT scene.
+          </action>
+        </step>
+
+        <step n="4" name="Verify Continuity">
+          <check if="not first_scene">
+            <on-pass>
+              <action>
+                Compare the first frame of this scene with the last frame of the previous scene.
+                Check for visual consistency: character appearance, lighting, environment.
+              </action>
+            </on-pass>
+          </check>
+        </step>
+      </template>
+    </pattern>
+
+  </special-patterns>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════════
+       SECTION 10: ENGINE DIRECTIVES
+       ════════════════════════════════════════════════════════════════════════════ -->
+
+  <engine-directives>
+
+    <directive name="ALWAYS" priority="critical">
+      These rules apply at ALL times during workflow execution, regardless of mode or context.
+
+      <rule id="D-01">SAVE outputs after EACH action that produces a file. Never batch saves.</rule>
+      <rule id="D-02">LOG every API call cost to _cost/actuals/. No exceptions.</rule>
+      <rule id="D-03">TRACK execution mode and respect mode-specific rules at all decision points.</rule>
+      <rule id="D-04">PRESERVE existing files unless explicitly instructed to overwrite. Use versioning (v1, v2, v3) for regenerated assets.</rule>
+      <rule id="D-05">DISPLAY progress indicators for every step, loop iteration, and parallel batch.</rule>
+      <rule id="D-06">RESOLVE all {variables} before executing any action that uses them.</rule>
+      <rule id="D-07">RESPECT the config inheritance chain: global -> module -> episode. Never use a global value when an episode override exists.</rule>
+      <rule id="D-08">ENFORCE quality gates. Quality gates cannot be skipped in ANY execution mode.</rule>
+      <rule id="D-09">HALT on unresolved critical variables. Never guess or fabricate values.</rule>
+      <rule id="D-10">WRITE cost actuals to disk immediately after each transaction. Never hold cost data only in memory.</rule>
+    </directive>
+
+    <directive name="NEVER" priority="critical">
+      These actions are PROHIBITED under all circumstances.
+
+      <rule id="N-01">NEVER execute an API call without checking cost thresholds first.</rule>
+      <rule id="N-02">NEVER skip a quality gate, even in yolo-uncapped mode.</rule>
+      <rule id="N-03">NEVER overwrite an asset file without versioning. If video-v1.mp4 exists and a retake is needed, create video-v2.mp4.</rule>
+      <rule id="N-04">NEVER proceed past a HALT error. HALT means STOP.</rule>
+      <rule id="N-05">NEVER fabricate or hallucinate file paths, costs, or API responses.</rule>
+      <rule id="N-06">NEVER load ALL skill supplementary files at once. Load JIT as needed during execution.</rule>
+      <rule id="N-07">NEVER modify the global.yaml, pricing.yaml, or module config.yaml files during workflow execution. These are configuration-time files, not runtime files.</rule>
+      <rule id="N-08">NEVER execute steps out of order unless directed by a goto tag.</rule>
+      <rule id="N-09">NEVER discard cost tracking data. Even if a workflow fails, the actuals file must reflect all spending that occurred.</rule>
+      <rule id="N-10">NEVER auto-approve a cost gate in normal or yolo mode. Only yolo-uncapped skips cost approval.</rule>
+    </directive>
+
+    <directive name="PREFER" priority="guidance">
+      These are best practices that should be followed when possible.
+
+      <rule id="P-01">PREFER loading skill supplementary files on-demand over pre-loading everything.</rule>
+      <rule id="P-02">PREFER parallel execution over sequential when the dependency graph allows it.</rule>
+      <rule id="P-03">PREFER presenting batch failures together over one-at-a-time error dialogs.</rule>
+      <rule id="P-04">PREFER the standard resolution profile unless the user or episode config specifies otherwise.</rule>
+      <rule id="P-05">PREFER retrying with a modified prompt over retrying with the exact same prompt on asset_quality_fail.</rule>
+      <rule id="P-06">PREFER compact progress output in yolo mode and detailed output in normal mode.</rule>
+      <rule id="P-07">PREFER showing cost impact whenever a user decision affects spending (e.g., choosing hd over standard).</rule>
+      <rule id="P-08">PREFER using the episode's existing assets when available rather than regenerating them.</rule>
+    </directive>
+
+  </engine-directives>
+
+
+  <!-- ════════════════════════════════════════════════════════════════════════════
+       SECTION 11: EXECUTION SUMMARY AND QUICK REFERENCE
+       ════════════════════════════════════════════════════════════════════════════ -->
+
+  <quick-reference>
+    <title>COOKIE Workflow Engine — Execution Quick Reference</title>
+
+    <lifecycle>
+      1. DETECT project root (find _cookie/ directory)
+      2. PARSE workflow.yaml (the "what")
+      3. RESOLVE config inheritance (global -> module -> episode)
+      4. LOAD skills JIT (tool knowledge files)
+      5. DISCOVER inputs (files the workflow needs)
+      6. ENFORCE pre_start quality gates
+      7. INITIALIZE cost tracking
+      8. ANNOUNCE workflow start
+      9. EXECUTE steps sequentially (the "how" — defined in instructions.xml)
+         - For each step: check conditions -> preflight -> execute -> handle errors -> store outputs
+         - Respect execution mode at every decision point
+         - Track costs for every API call
+         - Enforce per_scene quality gates
+      10. ENFORCE post_complete quality gates
+      11. GENERATE cost summary
+      12. GENERATE handoff document
+      13. UPDATE agent memory (if applicable)
+      14. PRESENT completion summary
+    </lifecycle>
+
+    <mode-comparison>
+      <!--
+      | Behavior              | normal           | yolo             | yolo-uncapped    |
+      |===|===|===|===|
+      | template-output       | Wait for ack     | Display, proceed | Display, proceed |
+      | ask blocks            | Wait for answer  | Use defaults     | Use defaults     |
+      | cost-gate             | Require approval | Require approval | Log and proceed  |
+      | quality gates         | Enforce (halt)   | Enforce (halt)   | Enforce (halt)   |
+      | Destructive confirm   | Require confirm  | Auto-proceed     | Auto-proceed     |
+      | Progress display      | Detailed         | Compact          | Compact + cost   |
+      | Mid-workflow toggle   | Yes              | Yes              | Yes              |
+      -->
+    </mode-comparison>
+
+    <tag-summary>
+      <!--
+      Structural: step, for-each, repeat
+      Execution:  action, check, ask, goto, invoke-workflow, invoke-task, invoke-protocol
+      Output:     template-output (with critical and example children)
+      Pipeline:   parallel, on-error, gate, cost-gate
+      -->
+    </tag-summary>
+
+    <error-type-summary>
+      <!--
+      | Error Type          | Default Behavior     | Retries | Halts? |
+      |===|===|===|===|
+      | missing_file        | ask_user             | 0       | Maybe  |
+      | unresolved_variable | halt                 | 0       | Yes    |
+      | validation_failure  | retry_once           | 1       | Maybe  |
+      | api_failure         | retry_with_backoff   | 3       | Maybe  |
+      | cost_exceeded       | halt_and_report      | 0       | Yes    |
+      | asset_quality_fail  | flag_for_review      | 0       | No     |
+      -->
+    </error-type-summary>
+
+    <protocol-summary>
+      <!--
+      | Protocol           | Purpose                          | Invoked By            |
+      |===|===|===|
+      | discover-inputs    | Smart file loading (3 strategies)| INIT-5, step actions  |
+      | preflight-check    | Variable & file validation       | INIT-3, step lifecycle|
+      | handoff            | Machine-readable workflow output  | FINAL-3               |
+      | dependency-resolve | Asset dependency graph execution  | Asset gen workflows   |
+      | cost-gate          | Cost estimation and approval      | cost-gate tag, steps  |
+      -->
+    </protocol-summary>
+
+  </quick-reference>
+
+</engine>

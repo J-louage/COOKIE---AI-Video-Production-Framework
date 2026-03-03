@@ -1,0 +1,32 @@
+name: build-dependency-graph
+workflow_id: build-dependency-graph
+module: production
+agent: storyboard-artist
+slash_command: /production-build-dependency-graph
+description: "Build asset dependency graph from SSD for parallel execution planning"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/2-pre-production/build-dependency-graph"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/prompt-engineering.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "all_assets_accounted_for == true"
+    - check: "no_circular_dependencies == true"
+    - check: "parallel_opportunities_identified == true"
+    - check: "character_refs_before_video_generation == true"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"

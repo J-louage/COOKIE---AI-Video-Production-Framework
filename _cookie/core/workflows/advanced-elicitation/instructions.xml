@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Core Workflow: Advanced Elicitation
+  Workflow ID: advanced-elicitation
+  Agent: Director (Christy)
+  Slash Command: /core-advanced-elicitation
+
+  Structured questioning workflow for ambiguous or incomplete user requests.
+  Progressively gathers information, leverages existing project assets,
+  builds a complete specification, and hands off to the correct entry workflow.
+-->
+<instructions>
+  <meta>
+    <workflow>advanced-elicitation</workflow>
+    <version>1.0</version>
+    <agent>director</agent>
+  </meta>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 1: DETECT AMBIGUITY                                         -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="1" name="detect_ambiguity">
+    <description>
+      Analyze the user's request. Check if it has enough specificity for any
+      workflow to execute. If the request is clear and maps directly to a
+      workflow, skip elicitation and hand off immediately. If ambiguous, proceed.
+    </description>
+    <actions>
+      <action>Parse the user's raw request for intent signals and keywords.</action>
+      <action>
+        Check against known workflow entry points:
+        - Does it mention a script, idea, concept? -> idea-to-script
+        - Does it reference an existing episode? -> video-extend-plan or regenerate-scene
+        - Does it provide audio/transcript? -> audio-to-script
+        - Does it ask for quick output? -> quick-video or quick-social
+        - Does it ask for brainstorming? -> brainstorm-concept
+      </action>
+      <action>
+        Evaluate clarity score:
+        - HIGH: Request maps unambiguously to one workflow with sufficient inputs -> skip to Step 7 (handoff)
+        - MEDIUM: Request maps to a workflow but is missing key inputs -> proceed to Step 3 (targeted questions)
+        - LOW: Request is vague, multi-intent, or exploratory -> proceed to Step 2 (classify)
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 2: CLASSIFY REQUEST TYPE                                    -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="2" name="classify_request_type">
+    <description>
+      Determine the request category to guide which questions to ask.
+    </description>
+    <actions>
+      <action>
+        Classify into one of the following categories:
+
+        Category: NEW VIDEO FROM IDEA
+        Needs: format, duration, style, characters, brand, audience
+        Entry workflow: idea-to-script
+
+        Category: NEW EPISODE IN EXISTING PROJECT
+        Needs: title, format, shared characters, new characters, music preferences
+        Entry workflow: idea-to-script (with episode context)
+
+        Category: MODIFY EXISTING VIDEO/EPISODE
+        Needs: which episode, which scenes, what changes
+        Entry workflow: video-extend-plan or regenerate-scene
+
+        Category: CREATIVE EXPLORATION
+        Needs: topic, constraints, mood, audience
+        Entry workflow: brainstorm-concept
+
+        Category: TECHNICAL QUERY
+        Needs: which tool/workflow, what parameter
+        Entry workflow: help or direct workflow invocation
+      </action>
+      <action>
+        If multiple categories apply, ask the user to clarify primary intent
+        before proceeding.
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 3: PROGRESSIVE DISCLOSURE                                   -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="3" name="progressive_disclosure">
+    <description>
+      Start with essential questions based on request type. Ask 2-3 questions
+      maximum per round. Use existing project context (format-presets.yaml,
+      existing characters, past episodes) to offer smart suggestions rather
+      than open-ended questions.
+    </description>
+    <actions>
+      <action>
+        Round 1 -- Essential Questions (always ask):
+        Based on request type, select the 2-3 most critical unknowns:
+        - NEW VIDEO: "What is the core topic/message?" + "Who is the target audience?"
+        - NEW EPISODE: "Which series/project?" + "What happens in this episode?"
+        - MODIFY: "Which episode/scene?" + "What should change?"
+        - CREATIVE: "What topic or theme?" + "Any constraints (duration, style)?"
+        - TECHNICAL: "Which workflow or tool?" + "What are you trying to achieve?"
+      </action>
+      <action>
+        Round 2 -- Contextual Questions (if needed):
+        Based on Round 1 answers, ask about:
+        - Format preferences (offer presets from format-presets.yaml)
+        - Character needs (offer existing characters for reuse)
+        - Style/mood (offer style guide references)
+        - Duration and pacing
+      </action>
+      <action>
+        Round 3 -- Refinement (only if still incomplete):
+        - Audio/music preferences
+        - Budget constraints
+        - Deadline requirements
+        - Special technical requirements
+      </action>
+      <action>
+        RULE: Never ask more than 3 questions per round.
+        RULE: Always offer defaults and suggestions, not just open questions.
+        RULE: Skip rounds if sufficient information is already gathered.
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 4: SUGGEST FROM EXISTING ASSETS                             -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="4" name="suggest_from_existing">
+    <description>
+      Load existing project assets and offer them as smart suggestions
+      to reduce friction and maintain consistency.
+    </description>
+    <actions>
+      <action>
+        Load format-presets.yaml for format suggestions:
+        - List available presets with their descriptions
+        - Recommend a preset based on the user's stated audience/platform
+        - Allow custom format if no preset fits
+      </action>
+      <action>
+        Load existing characters from characters/ directories:
+        - List characters with thumbnail descriptions
+        - Suggest character reuse for series continuity
+        - Offer to create new characters if needed
+      </action>
+      <action>
+        Load episode history for continuity options:
+        - List recent episodes in the same project/series
+        - Highlight recurring themes, styles, and narrative threads
+        - Suggest continuity elements (recurring characters, visual style, music themes)
+      </action>
+      <action>
+        Present options with defaults where possible:
+        - "Based on your previous episodes, I suggest [format X] with [characters Y, Z]. Sound good, or would you like to change anything?"
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 5: BUILD SPECIFICATION                                      -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="5" name="build_specification">
+    <description>
+      Compile all answers into a complete specification document.
+      Validate completeness -- every downstream workflow input must be filled.
+    </description>
+    <actions>
+      <action>
+        Compile the specification document with the following fields:
+
+        REQUIRED FIELDS:
+        - title: Working title for the video/episode
+        - format: Format preset name or custom format definition
+        - duration: Target duration (must align with format preset)
+        - style: Visual style reference or description
+        - narrative_goal: What the video should achieve
+        - audience: Target audience description
+
+        CONDITIONAL FIELDS (based on request type):
+        - characters: List of characters (existing refs or new descriptions)
+        - series_context: Episode number, previous episode summary (for series)
+        - scenes_to_modify: Scene IDs and change descriptions (for modifications)
+        - mood: Emotional tone and atmosphere
+        - audio_preferences: Music style, narration voice, SFX notes
+        - budget_constraints: Maximum cost or cost tier
+        - brand_guidelines: Brand reference if applicable
+        - platform: Target distribution platform(s)
+      </action>
+      <action>
+        Validate completeness:
+        - All REQUIRED fields must have values
+        - Conditional fields must be filled based on request type
+        - Format/duration must be compatible (check against format-presets.yaml)
+        - Characters must either reference existing identity.json or include enough detail for creation
+        - Flag any gaps and ask the user to fill them before proceeding
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 6: IDENTIFY HANDOFF WORKFLOW                                -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="6" name="identify_handoff">
+    <description>
+      Based on the completed specification, identify the correct entry workflow.
+    </description>
+    <actions>
+      <action>
+        Map specification to workflow:
+        - User has an idea/concept only            -> idea-to-script
+        - User provides a written script           -> validate-script
+        - User provides audio/recording            -> audio-to-script
+        - User wants to extend/modify existing     -> video-extend-plan
+        - User wants rapid single video            -> quick-video
+        - User wants rapid social clip             -> quick-social
+        - User wants creative exploration          -> brainstorm-concept
+      </action>
+      <action>
+        Verify the identified workflow exists:
+        - Check workflow.yaml exists at the expected path
+        - Verify the workflow's required inputs match the specification fields
+        - If workflow not found, fall back to the closest alternative and warn the user
+      </action>
+    </actions>
+  </step>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- STEP 7: HANDOFF                                                  -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <step n="7" name="handoff">
+    <description>
+      Present the specification summary to the user, confirm the handoff
+      workflow, and pass the specification to the target workflow.
+    </description>
+    <actions>
+      <action>
+        Present the specification summary:
+        - Show all filled fields in a structured format
+        - Highlight the identified handoff workflow
+        - Show any defaults that were applied
+      </action>
+      <action>
+        Request user confirmation:
+        - "Here is your specification. The next step is [workflow name]. Shall I proceed?"
+        - Allow the user to revise any field before confirming
+        - If the user wants changes, loop back to the relevant step
+      </action>
+      <action>
+        On confirmation:
+        - Pass the complete specification to the target workflow
+        - Log the elicitation session for future reference
+        - Transfer control to the target workflow's agent
+      </action>
+    </actions>
+  </step>
+
+</instructions>

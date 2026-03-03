@@ -1,0 +1,63 @@
+command,description,target_type,target_path
+cookie-director,Activate Director (Christy) — Master orchestrator,agent,core/agents/director.md
+cookie-producer,Activate Producer (Max) — Cost tracker,agent,core/agents/producer.md
+cookie-screenwriter,Activate Screenwriter (Nora),agent,production/agents/screenwriter.md
+cookie-storyboard,Activate Storyboard Artist (Luca),agent,production/agents/storyboard-artist.md
+cookie-character,Activate Character Designer (Iris),agent,production/agents/character-designer.md
+cookie-prompt-engineer,Activate Prompt Engineer (Zara),agent,production/agents/prompt-engineer.md
+cookie-cinematographer,Activate Cinematographer (Orion),agent,production/agents/cinematographer.md
+cookie-voice,Activate Voice Director (Celeste),agent,production/agents/voice-director.md
+cookie-demo,Activate Demo Producer (Kai),agent,production/agents/demo-producer.md
+cookie-sound,Activate Sound Designer (Reed),agent,production/agents/sound-designer.md
+cookie-motion,Activate Motion Designer (Felix),agent,composition/agents/motion-designer.md
+cookie-editor,Activate Editor (Ava),agent,composition/agents/editor.md
+cookie-creative,Activate Creative Director (Nova),agent,creative/agents/creative-director.md
+cookie-idea,Transform concept into canonical script,workflow,production/workflows/1-ideation/idea-to-script
+cookie-validate-script,Validate and normalize user-provided script,workflow,production/workflows/1-ideation/validate-script
+cookie-audio-to-script,Transcribe audio and build visual script,workflow,production/workflows/1-ideation/audio-to-script
+cookie-extend-plan,Plan video extension/modification,workflow,production/workflows/1-ideation/video-extend-plan
+cookie-script-review,Creative review of finalized script,workflow,production/workflows/1-ideation/script-review
+cookie-create-character,Create character identity and reference images,workflow,production/workflows/2-pre-production/create-character-sheet
+cookie-create-style,Define visual style guide,workflow,production/workflows/2-pre-production/create-style-guide
+cookie-create-ssd,Generate Scene Specification Document from script,workflow,production/workflows/2-pre-production/create-scene-spec
+cookie-dependency-graph,Build asset dependency graph,workflow,production/workflows/2-pre-production/build-dependency-graph
+cookie-prompt-library,Generate all prompts with consistency validation,workflow,production/workflows/2-pre-production/generate-prompt-library
+cookie-pre-prod-review,Review SSD and approve cost estimate,workflow,production/workflows/2-pre-production/pre-production-review
+cookie-gen-char-refs,Generate multi-angle character reference images,workflow,production/workflows/3-asset-generation/generate-character-refs
+cookie-gen-frames,Generate first/last frames for scene continuity,workflow,production/workflows/3-asset-generation/generate-frames
+cookie-gen-video,Generate video clips via VEO,workflow,production/workflows/3-asset-generation/generate-video-clips
+cookie-gen-narration,Generate narration via ElevenLabs,workflow,production/workflows/3-asset-generation/generate-narration
+cookie-record-screen,Capture screen recordings via Playwright,workflow,production/workflows/3-asset-generation/record-screen-capture
+cookie-gen-audio,Generate music and sound effects,workflow,production/workflows/3-asset-generation/generate-music-sfx
+cookie-asset-qa,Validate generated assets against SSD,workflow,production/workflows/3-asset-generation/asset-qa
+cookie-remotion-assembly,Assemble assets into Remotion composition,workflow,production/workflows/4-composition/remotion-assembly
+cookie-audio-sync,Synchronize audio with video timeline,workflow,production/workflows/4-composition/audio-sync
+cookie-text-animation,Add text overlays and captions,workflow,production/workflows/4-composition/text-animation
+cookie-preview,Render low-res preview for review,workflow,production/workflows/4-composition/composition-preview
+cookie-final-render,Render full-resolution primary format,workflow,production/workflows/5-post-production/final-render
+cookie-multi-export,Generate all export formats,workflow,production/workflows/5-post-production/multi-format-export
+cookie-subtitles,Generate and burn-in subtitles,workflow,production/workflows/5-post-production/subtitle-generation
+cookie-thumbnails,Generate thumbnail images per format,workflow,production/workflows/5-post-production/thumbnail-generation
+cookie-final-qa,Final quality checklist before delivery,workflow,production/workflows/5-post-production/final-qa
+cookie-quick-video,Rapid single-video production,workflow,production/workflows/quick-flow/quick-video
+cookie-quick-social,Rapid social media clip generation,workflow,production/workflows/quick-flow/quick-social
+cookie-regen-scene,Regenerate specific scenes with revised prompts,workflow,production/workflows/anytime/regenerate-scene
+cookie-cost-status,Show current cost status vs estimate,workflow,production/workflows/anytime/cost-status
+cookie-episode-status,Show episode production status,workflow,production/workflows/anytime/episode-status
+cookie-remotion-project,Scaffold new Remotion project from template,workflow,composition/workflows/create-remotion-project
+cookie-render-preview,Render low-res preview via Remotion,workflow,composition/workflows/render-preview
+cookie-render-final,Render final output at target resolution,workflow,composition/workflows/render-final
+cookie-brainstorm,Brainstorm video concepts from brief,workflow,creative/workflows/brainstorm-concept
+cookie-moodboard,Create visual moodboard for episode,workflow,creative/workflows/moodboard-creation
+cookie-brand-review,Review video against brand guidelines,workflow,creative/workflows/brand-alignment-review
+cookie-help,Context-sensitive help,task,core/tasks/help.md
+cookie-cost-estimate,Calculate cost estimate from SSD,task,core/tasks/cost-estimate.xml
+cookie-cost-report,Generate final cost report,task,core/tasks/cost-report.xml
+cookie-assets,List all generated assets with status,task,core/tasks/asset-inventory.xml
+cookie-format-adapt,Generate derived SSD for alternate format,task,core/tasks/format-adapt.xml
+cookie-validate-ssd,Validate SSD against tool constraints,task,core/tasks/validate-ssd.xml
+cookie-validate-char,Validate character sheet against schema,task,core/tasks/validate-character.xml
+cookie-merge-scenes,Merge VEO clips into continuous scene,task,core/tasks/merge-scenes.xml
+cookie-continuity,Check visual continuity across scenes,task,core/tasks/review-continuity.xml
+cookie-validate-framework,Scan framework for consistency,task,core/tasks/validate-framework.xml
+cookie-elicit,Guided questioning for unclear requests,workflow,core/workflows/advanced-elicitation/workflow.yaml

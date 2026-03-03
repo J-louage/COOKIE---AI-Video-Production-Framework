@@ -1,0 +1,22 @@
+# COOKIE Framework — Global Configuration
+# This file is inherited by all module configs via the 'inherits' key.
+# Override any value at the module, project, or episode level.
+
+framework_name: "COOKIE"
+framework_version: "1.0.0"
+user_name: "Jlouage"
+communication_language: "English"
+document_output_language: "English"
+user_skill_level: "advanced"
+project_root: "{auto-detect}"
+
+# Default tool preferences
+default_veo_model: "veo-3.0-generate-001"
+default_veo_speed: "fast"
+default_nano_banana_model: "gemini-3.1-flash-image-preview"
+default_resolution_profile: "standard"
+
+# Cost management
+cost_gate_behavior: "configurable"    # always | per-batch | at-approval | yolo
+retake_budget_percent: 20             # Add 20% buffer to estimates for retakes
+max_retakes_per_scene: 3

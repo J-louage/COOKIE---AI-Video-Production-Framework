@@ -1,0 +1,588 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  COOKIE Framework — Protocol: Cost Gate
+  Cost estimation, approval, and budget enforcement protocol.
+
+  This protocol calculates the estimated cost of a production step or
+  workflow before execution, presents a detailed breakdown to the user,
+  and requires explicit approval before proceeding. It enforces per-scene
+  and cumulative budget thresholds to prevent runaway costs.
+-->
+<protocol id="cost-gate" version="1.0">
+
+  <metadata>
+    <name>Cost Gate</name>
+    <description>
+      Calculates production costs from the SSD and pricing configuration,
+      presents a detailed cost breakdown to the user, and enforces budget
+      thresholds. No billable work proceeds without passing the cost gate.
+      This protocol ensures creators maintain control over their production
+      budget at every stage.
+    </description>
+    <triggers>
+      <trigger>Before any workflow step that incurs API/tool costs.</trigger>
+      <trigger>Before an entire workflow begins (aggregate estimate).</trigger>
+      <trigger>When the Director routes to a new workflow (cumulative check).</trigger>
+    </triggers>
+    <inputs>
+      <input>
+        <name>pricing.yaml</name>
+        <path>{project-root}/_cookie/_config/pricing.yaml</path>
+        <description>
+          Tool and API pricing configuration. Contains per-unit costs
+          for every tool used in the COOKIE production pipeline.
+        </description>
+      </input>
+      <input>
+        <name>SSD (Scene Specification Document)</name>
+        <path>{episode_path}/ssd/</path>
+        <description>
+          The scene specifications that define what assets need to be
+          generated and at what quality level. Used to calculate quantities.
+        </description>
+      </input>
+      <input>
+        <name>Execution Plan</name>
+        <source>Output of dependency-resolve protocol.</source>
+        <description>
+          The ordered execution plan with all tasks and their associated tools.
+        </description>
+      </input>
+    </inputs>
+  </metadata>
+
+  <!-- ================================================================
+       SECTION 1: PRICING CONFIGURATION SCHEMA
+       ================================================================ -->
+  <pricing_config>
+    <description>
+      Expected structure of the pricing.yaml configuration file.
+      This file maps tools to their per-unit costs at different quality levels.
+    </description>
+
+    <expected_schema><![CDATA[
+# pricing.yaml schema
+
+version: "1.0"
+
+# Budget configuration
+budget:
+  per_episode_limit_usd: 50.00        # Maximum spend per episode
+  per_scene_warn_usd: 5.00            # Warn when a single scene exceeds this
+  per_scene_halt_usd: 10.00           # Halt when a single scene exceeds this
+  cumulative_warn_percent: 80          # Warn at this % of per_episode_limit
+  cumulative_halt_percent: 120         # Hard halt at this % of per_episode_limit
+  retake_buffer_percent: 20            # Reserve this % of budget for retakes
+
+# Per-tool pricing at different resolution/quality tiers
+tools:
+  dall-e-3:
+    description: "Image generation"
+    unit: "image"
+    tiers:
+      draft:
+        resolution: "1024x1024"
+        cost_per_unit_usd: 0.040
+      standard:
+        resolution: "1024x1024"
+        cost_per_unit_usd: 0.040
+      hd:
+        resolution: "1024x1792"
+        cost_per_unit_usd: 0.080
+      4k:
+        resolution: "1024x1792"
+        cost_per_unit_usd: 0.080
+
+  runway-gen4:
+    description: "Video generation"
+    unit: "second"
+    tiers:
+      draft:
+        resolution: "720p"
+        cost_per_unit_usd: 0.050
+      standard:
+        resolution: "1080p"
+        cost_per_unit_usd: 0.050
+      hd:
+        resolution: "1080p"
+        cost_per_unit_usd: 0.050
+      4k:
+        resolution: "4K"
+        cost_per_unit_usd: 0.100
+
+  elevenlabs:
+    description: "Voice narration"
+    unit: "character"
+    tiers:
+      draft:
+        quality: "standard"
+        cost_per_unit_usd: 0.00018
+      standard:
+        quality: "standard"
+        cost_per_unit_usd: 0.00018
+      hd:
+        quality: "professional"
+        cost_per_unit_usd: 0.00030
+      4k:
+        quality: "professional"
+        cost_per_unit_usd: 0.00030
+
+  suno:
+    description: "Music generation"
+    unit: "track"
+    tiers:
+      draft:
+        duration: "30s"
+        cost_per_unit_usd: 0.10
+      standard:
+        duration: "60s"
+        cost_per_unit_usd: 0.10
+      hd:
+        duration: "120s"
+        cost_per_unit_usd: 0.20
+      4k:
+        duration: "120s"
+        cost_per_unit_usd: 0.20
+
+  gpt-4o:
+    description: "Text generation (LLM)"
+    unit: "1k_tokens"
+    tiers:
+      draft:
+        cost_per_unit_usd: 0.005
+      standard:
+        cost_per_unit_usd: 0.005
+      hd:
+        cost_per_unit_usd: 0.005
+      4k:
+        cost_per_unit_usd: 0.005
+]]></expected_schema>
+  </pricing_config>
+
+  <!-- ================================================================
+       SECTION 2: COST CALCULATION PROCEDURE
+       ================================================================ -->
+  <cost_calculation>
+    <description>
+      How the cost gate calculates estimated costs from the SSD and
+      pricing configuration.
+    </description>
+
+    <procedure>
+      <step order="1">
+        <name>Load Pricing Configuration</name>
+        <action>
+          Read `{project-root}/_cookie/_config/pricing.yaml` using the
+          discover-inputs protocol with FULL_LOAD strategy.
+          Validate it against the expected schema.
+          If missing or invalid, trigger `on_error.missing_file` or
+          `on_error.validation_failure`.
+        </action>
+      </step>
+
+      <step order="2">
+        <name>Determine Quality Tier</name>
+        <action>
+          Read the resolution/quality setting from the workflow context
+          or episode config. This determines which pricing tier to use
+          for all cost calculations.
+          Supported tiers: draft, standard, hd, 4k.
+          Default to "standard" if not specified.
+        </action>
+      </step>
+
+      <step order="3">
+        <name>Parse SSD for Asset Quantities</name>
+        <action>
+          Analyze the SSD to determine what needs to be generated:
+          <quantities>
+            <quantity type="images">
+              Count of first-frames and character reference sheets.
+              Derived from the number of scenes and unique characters.
+            </quantity>
+            <quantity type="video_seconds">
+              Total video duration across all scenes.
+              Derived from scene durations specified in the SSD.
+            </quantity>
+            <quantity type="narration_characters">
+              Total character count for narration text.
+              Derived from dialogue and narration scripts in the SSD.
+            </quantity>
+            <quantity type="music_tracks">
+              Number of music tracks needed.
+              Derived from the episode music requirements in the SSD.
+            </quantity>
+            <quantity type="sfx_items">
+              Number of sound effects needed.
+              Derived from scene-level SFX annotations in the SSD.
+            </quantity>
+            <quantity type="llm_tokens">
+              Estimated LLM token usage for prompt generation, script
+              refinement, and other text tasks.
+            </quantity>
+          </quantities>
+        </action>
+      </step>
+
+      <step order="4">
+        <name>Calculate Per-Scene Costs</name>
+        <action>
+          For each scene in the SSD:
+          - Identify all assets required for that scene.
+          - Look up the per-unit cost for each tool at the selected tier.
+          - Multiply quantity by per-unit cost.
+          - Sum to get the total estimated cost for the scene.
+          - Apply the retake buffer (add retake_buffer_percent to the estimate).
+        </action>
+      </step>
+
+      <step order="5">
+        <name>Calculate Per-Tool Costs</name>
+        <action>
+          Aggregate costs across all scenes, grouped by tool.
+          This shows which tools are the biggest cost drivers.
+        </action>
+      </step>
+
+      <step order="6">
+        <name>Calculate Total Estimated Cost</name>
+        <action>
+          Sum all per-scene costs to get the total workflow cost.
+          Add the retake buffer as a separate line item.
+          Calculate the cumulative cost (this workflow + all previous
+          workflows in the session).
+        </action>
+      </step>
+
+      <step order="7">
+        <name>Calculate Resolution Alternatives</name>
+        <action>
+          Re-run the cost calculation for each available quality tier
+          (draft, standard, hd, 4k) to show the user cost comparisons.
+          This helps users make informed decisions about quality vs. budget.
+        </action>
+      </step>
+    </procedure>
+  </cost_calculation>
+
+  <!-- ================================================================
+       SECTION 3: COST BREAKDOWN PRESENTATION
+       ================================================================ -->
+  <cost_presentation>
+    <description>
+      Format for presenting the cost breakdown to the user before
+      requesting approval.
+    </description>
+
+    <display_format><![CDATA[
+╔══════════════════════════════════════════════════════════════════╗
+║                    COST ESTIMATE — {workflow_name}              ║
+║                    Episode: {episode_id}                        ║
+║                    Quality: {tier}                              ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  PER-SCENE BREAKDOWN                                             ║
+║  ┌─────────────┬────────────┬────────────┬───────────────────┐   ║
+║  │ Scene       │ Tool       │ Quantity   │ Est. Cost (USD)   │   ║
+║  ├─────────────┼────────────┼────────────┼───────────────────┤   ║
+║  │ Scene 01    │ dall-e-3   │ 2 images   │ $0.08             │   ║
+║  │             │ runway     │ 12s video  │ $0.60             │   ║
+║  │             │ elevenlabs │ 450 chars  │ $0.08             │   ║
+║  │             │ Scene total│            │ $0.76             │   ║
+║  ├─────────────┼────────────┼────────────┼───────────────────┤   ║
+║  │ Scene 02    │ dall-e-3   │ 1 image    │ $0.04             │   ║
+║  │             │ runway     │ 10s video  │ $0.50             │   ║
+║  │             │ elevenlabs │ 380 chars  │ $0.07             │   ║
+║  │             │ Scene total│            │ $0.61             │   ║
+║  └─────────────┴────────────┴────────────┴───────────────────┘   ║
+║                                                                  ║
+║  SHARED ASSETS                                                   ║
+║  ┌─────────────────────────────────────┬───────────────────────┐ ║
+║  │ Asset                               │ Est. Cost (USD)       │ ║
+║  ├─────────────────────────────────────┼───────────────────────┤ ║
+║  │ Character refs (2 chars)            │ $0.08                 │ ║
+║  │ Music track                         │ $0.10                 │ ║
+║  │ SFX pack                            │ $0.05                 │ ║
+║  │ LLM prompts                         │ $0.12                 │ ║
+║  └─────────────────────────────────────┴───────────────────────┘ ║
+║                                                                  ║
+║  TOTALS                                                          ║
+║  ┌─────────────────────────────────────┬───────────────────────┐ ║
+║  │ Subtotal                            │ $1.72                 │ ║
+║  │ Retake buffer (20%)                 │ $0.34                 │ ║
+║  │ ESTIMATED TOTAL                     │ $2.06                 │ ║
+║  ├─────────────────────────────────────┼───────────────────────┤ ║
+║  │ Session cumulative                  │ $14.80                │ ║
+║  │ Budget remaining                    │ $35.20                │ ║
+║  │ Budget utilization                  │ 29.6%                 │ ║
+║  └─────────────────────────────────────┴───────────────────────┘ ║
+║                                                                  ║
+║  RESOLUTION ALTERNATIVES                                         ║
+║  ┌───────────┬──────────┬───────────┬───────────┬──────────────┐ ║
+║  │           │ Draft    │ Standard  │ HD        │ 4K           │ ║
+║  ├───────────┼──────────┼───────────┼───────────┼──────────────┤ ║
+║  │ Est. Cost │ $1.20    │ $2.06  ◄  │ $3.15     │ $4.40        │ ║
+║  │ Quality   │ Preview  │ Good      │ High      │ Cinema       │ ║
+║  └───────────┴──────────┴───────────┴───────────┴──────────────┘ ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+]]></display_format>
+  </cost_presentation>
+
+  <!-- ================================================================
+       SECTION 4: THRESHOLD ENFORCEMENT
+       ================================================================ -->
+  <thresholds>
+    <description>
+      Budget thresholds that trigger warnings or halts during cost
+      evaluation. These protect against unexpectedly high costs.
+    </description>
+
+    <threshold id="per_scene_warn">
+      <description>Warn when a single scene's estimated cost exceeds this amount.</description>
+      <default_value unit="USD">5.00</default_value>
+      <config_key>budget.per_scene_warn_usd</config_key>
+      <action>
+        Display a warning to the user highlighting the expensive scene.
+        Show which tools are driving the high cost.
+        Suggest alternatives (lower resolution, fewer retakes, simpler scene).
+        Allow the user to approve or modify.
+      </action>
+    </threshold>
+
+    <threshold id="per_scene_halt">
+      <description>Halt when a single scene's estimated cost exceeds this amount.</description>
+      <default_value unit="USD">10.00</default_value>
+      <config_key>budget.per_scene_halt_usd</config_key>
+      <action>
+        HALT the workflow. Do not proceed without explicit user intervention.
+        Display the cost breakdown for the expensive scene.
+        Require the user to either:
+        - Approve the cost explicitly.
+        - Choose a lower quality tier.
+        - Modify the scene specification to reduce cost.
+        - Skip the scene.
+        Trigger `on_error.cost_exceeded` from error-recovery.xml.
+      </action>
+    </threshold>
+
+    <threshold id="cumulative_warn">
+      <description>
+        Warn when cumulative session cost reaches this percentage of
+        the per-episode budget limit.
+      </description>
+      <default_value unit="percent">80</default_value>
+      <config_key>budget.cumulative_warn_percent</config_key>
+      <action>
+        Display a budget utilization warning.
+        Show how much budget remains.
+        Show estimated cost of remaining work.
+        Advise the user whether the remaining budget is sufficient
+        to complete the episode.
+      </action>
+    </threshold>
+
+    <threshold id="cumulative_halt">
+      <description>
+        Hard halt when cumulative session cost reaches this percentage
+        of the per-episode budget limit.
+      </description>
+      <default_value unit="percent">120</default_value>
+      <config_key>budget.cumulative_halt_percent</config_key>
+      <action>
+        HALT the entire production session. No further billable work
+        is permitted until the user explicitly increases the budget
+        or resets the session cost tracker.
+        Trigger `on_error.cost_exceeded` from error-recovery.xml.
+        Present a full cost report of all workflows in the session.
+      </action>
+    </threshold>
+  </thresholds>
+
+  <!-- ================================================================
+       SECTION 5: APPROVAL FLOW
+       ================================================================ -->
+  <approval_flow>
+    <description>
+      The approval flow that must be completed before billable work begins.
+    </description>
+
+    <standard_mode>
+      <description>
+        Normal operation mode. User sees the cost estimate and must
+        explicitly approve before work begins.
+      </description>
+      <procedure>
+        <step order="1">Calculate costs (Section 2).</step>
+        <step order="2">Check thresholds (Section 4). If any halt threshold is hit, stop here.</step>
+        <step order="3">Present the cost breakdown (Section 3).</step>
+        <step order="4">
+          Prompt the user for approval:
+          <options>
+            <option key="approve">Approve and proceed with the estimated cost.</option>
+            <option key="approve_tier">Approve but switch to a different quality tier.</option>
+            <option key="modify">Go back and modify the SSD to reduce cost.</option>
+            <option key="skip">Skip this workflow entirely.</option>
+            <option key="cancel">Cancel the entire production session.</option>
+          </options>
+        </step>
+        <step order="5">
+          If approved: record the approval in the workflow context and proceed.
+          If not approved: halt the workflow with the user's chosen action.
+        </step>
+      </procedure>
+    </standard_mode>
+
+    <yolo_mode>
+      <description>
+        "YOLO" mode allows faster iteration by auto-approving costs
+        that fall within thresholds. However, the cost estimate is still
+        presented and approval is still required. YOLO mode simply
+        reduces the friction — it auto-approves if costs are within
+        normal bounds and only asks for manual approval on threshold
+        violations.
+      </description>
+      <procedure>
+        <step order="1">Calculate costs (Section 2).</step>
+        <step order="2">Check thresholds (Section 4).</step>
+        <step order="3">Present the cost breakdown (abbreviated format).</step>
+        <step order="4">
+          If ALL thresholds pass (no warnings, no halts):
+          - Display the total estimated cost on a single line.
+          - STILL REQUIRE explicit user approval (brief confirmation).
+          - Rationale: even in yolo mode, the user must acknowledge costs.
+        </step>
+        <step order="5">
+          If any threshold is violated:
+          - Fall back to standard_mode behavior.
+          - Show the full cost breakdown and require manual decision.
+        </step>
+      </procedure>
+    </yolo_mode>
+
+    <yolo_uncapped_mode>
+      <description>
+        "YOLO Uncapped" mode bypasses all approval gates. Costs are still
+        calculated and logged, but the user is NOT prompted for approval.
+        This mode is for experienced users who want zero interruptions.
+        USE WITH CAUTION — there is no spending limit enforcement.
+      </description>
+      <procedure>
+        <step order="1">Calculate costs (Section 2).</step>
+        <step order="2">Log the cost estimate to the workflow cost tracker.</step>
+        <step order="3">
+          Display a brief one-line cost notification (non-blocking):
+          "[cost-gate] Estimated: $X.XX | Session total: $Y.YY | Proceeding..."
+        </step>
+        <step order="4">
+          Proceed immediately without waiting for approval.
+          Thresholds are still checked but only logged as warnings —
+          they do not halt execution.
+        </step>
+      </procedure>
+      <safety_net>
+        Even in yolo-uncapped mode, a hard safety limit is enforced:
+        If cumulative session cost exceeds 5x the per_episode_limit,
+        the workflow HALTS regardless of mode. This prevents catastrophic
+        runaway costs due to bugs or infinite loops.
+        <hard_limit_multiplier>5</hard_limit_multiplier>
+      </safety_net>
+    </yolo_uncapped_mode>
+  </approval_flow>
+
+  <!-- ================================================================
+       SECTION 6: COST TRACKING
+       ================================================================ -->
+  <cost_tracking>
+    <description>
+      How actual costs are tracked during and after workflow execution,
+      compared against estimates, and persisted for reporting.
+    </description>
+
+    <during_execution>
+      <description>
+        As each step executes, actual costs are recorded and compared
+        against the pre-approved estimates.
+      </description>
+      <rules>
+        <rule name="record_actual">
+          After each billable step completes, record the actual cost
+          reported by the tool/API in the workflow cost tracker.
+        </rule>
+        <rule name="compare_estimate">
+          Compare actual cost against the estimated cost for that step.
+          If actual exceeds estimate by more than 50%, log a warning.
+        </rule>
+        <rule name="running_total">
+          Maintain a running total of actual costs. Re-check cumulative
+          thresholds after each step to catch budget overruns mid-workflow.
+        </rule>
+        <rule name="mid_workflow_halt">
+          If the running actual cost exceeds the approved estimate by
+          more than the retake buffer percentage, halt the workflow and
+          re-present the cost gate with updated actuals.
+        </rule>
+      </rules>
+    </during_execution>
+
+    <post_execution>
+      <description>
+        After workflow completion, produce a cost reconciliation report
+        comparing estimates to actuals.
+      </description>
+      <report_fields>
+        <field name="estimated_total_usd">The pre-approved estimated cost.</field>
+        <field name="actual_total_usd">The actual cost incurred.</field>
+        <field name="variance_usd">Difference (actual - estimated).</field>
+        <field name="variance_percent">Percentage variance.</field>
+        <field name="per_step_comparison">Side-by-side estimate vs. actual per step.</field>
+        <field name="retake_buffer_consumed_usd">How much of the retake buffer was used.</field>
+      </report_fields>
+      <storage>
+        Cost reports are written to:
+        `{episode_path}/.cookie/costs/{workflow_id}-cost-report.yaml`
+      </storage>
+    </post_execution>
+  </cost_tracking>
+
+  <!-- ================================================================
+       SECTION 7: ERROR HANDLING
+       ================================================================ -->
+  <error_handling>
+    <on_error type="cost_exceeded">
+      <description>
+        Triggered when any cost threshold is exceeded (per-scene halt
+        or cumulative halt).
+      </description>
+      <action>
+        Delegate to error-recovery.xml `cost_exceeded` handler:
+        - Halt the workflow.
+        - Present the full cost report.
+        - Ask the user for a decision: increase budget, lower quality,
+          modify scope, or cancel.
+      </action>
+    </on_error>
+
+    <on_error type="missing_file">
+      <description>
+        Triggered when pricing.yaml or SSD files are missing.
+      </description>
+      <action>
+        Delegate to error-recovery.xml `missing_file` handler.
+        Cost calculation cannot proceed without pricing data.
+      </action>
+    </on_error>
+
+    <on_error type="validation_failure">
+      <description>
+        Triggered when pricing.yaml has invalid format or missing
+        required fields.
+      </description>
+      <action>
+        Delegate to error-recovery.xml `validation_failure` handler.
+        Report which fields are missing or invalid.
+      </action>
+    </on_error>
+  </error_handling>
+
+</protocol>

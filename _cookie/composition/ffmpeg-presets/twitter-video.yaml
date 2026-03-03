@@ -1,0 +1,79 @@
+# Twitter/X Video Encoding Preset
+# 16:9 landscape format for Twitter/X video uploads.
+# Uses slightly higher CRF (25) for smaller files to stay within 512MB limit.
+# Twitter enforces a 2 minute 20 second maximum duration.
+
+preset_name: "twitter-video"
+platform: "Twitter/X"
+description: "Twitter/X video upload — H.264 at 1080p with higher CRF for smaller files, 512MB file size limit, 2m20s max duration"
+
+resolution:
+  width: 1920
+  height: 1080
+
+aspect_ratio: "16:9"
+frame_rate: 30
+
+codec_settings:
+  video_codec: "libx264"
+  pixel_format: "yuv420p"
+  crf: 25
+  preset: "medium"
+  profile: "high"
+  level: "4.1"
+
+audio_settings:
+  codec: "aac"
+  bitrate: "128k"
+  sample_rate: 44100
+  channels: 2
+
+constraints:
+  max_bitrate: null
+  bufsize: null
+  max_file_size: "512MB"
+  max_duration: 140        # 2 minutes 20 seconds
+
+ffmpeg_command: >-
+  ffmpeg -i {input}
+  -t 140
+  -c:v libx264 -pix_fmt yuv420p -crf 25 -preset medium
+  -profile:v high -level:v 4.1
+  -c:a aac -b:a 128k -ar 44100 -ac 2
+  -movflags +faststart
+  {output}.mp4
+
+# Two-pass encoding for file size constraint:
+# Use when CRF encoding exceeds the 512MB limit (rare for 140s content).
+#
+# Step 1: Calculate target video bitrate
+#   target_bitrate = (512 * 1024 * 1024 * 8 - 128000 * duration) / duration
+#   For 140s: target_bitrate ≈ 30.5 Mbps (very generous)
+#   For 120s: target_bitrate ≈ 35.6 Mbps
+#
+# Step 2: Two-pass encode
+ffmpeg_command_two_pass_1: >-
+  ffmpeg -y -i {input}
+  -t 140
+  -c:v libx264 -pix_fmt yuv420p -preset medium
+  -b:v {target_bitrate}
+  -pass 1 -an
+  -f null /dev/null
+
+ffmpeg_command_two_pass_2: >-
+  ffmpeg -y -i {input}
+  -t 140
+  -c:v libx264 -pix_fmt yuv420p -preset medium
+  -b:v {target_bitrate}
+  -pass 2
+  -c:a aac -b:a 128k -ar 44100 -ac 2
+  -movflags +faststart
+  {output}.mp4
+
+# Notes:
+# - CRF 25 (vs 23 for YouTube) produces slightly smaller files with minimal visible quality loss
+# - 512MB is generous for 140s of 1080p content; two-pass is rarely needed
+# - -t 140 enforces Twitter's 2 minute 20 second (140 second) duration limit
+# - Twitter supports 16:9, 1:1, and 9:16 aspect ratios; 16:9 is the default
+# - Twitter re-encodes all uploads; providing clean source helps quality retention
+# - For Twitter Spaces clips or longer content, consider lower CRF or resolution

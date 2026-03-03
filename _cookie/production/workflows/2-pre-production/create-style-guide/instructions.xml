@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>create-style-guide</workflow>
+    <description>Create project visual style guide with VEO/Nano Banana tokens</description>
+    <agent>character-designer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_script_and_brand">
+      <action>Load the canonical script to understand the content, mood, and visual requirements. Load brand guidelines to extract brand identity constraints: approved colors, typography rules, logo usage, visual tone, and any restrictions. These form the foundation for the style guide.</action>
+      <output>Script analysis and brand constraints document</output>
+    </step>
+
+    <step id="2" name="define_color_palette">
+      <action>Define the project color palette: primary colors (2-3), secondary colors (2-3), accent colors (1-2), background tones, and text colors. Specify hex values. Map colors to their usage contexts (backgrounds, characters, UI elements, highlights). Ensure palette aligns with brand guidelines and supports the script's mood.</action>
+      <output>Color palette specification with hex values and usage mapping</output>
+    </step>
+
+    <step id="3" name="define_typography">
+      <action>Define typography rules for any on-screen text: heading font family and weight, body text font family and weight, caption/subtitle font, minimum text sizes per resolution, text color rules, and text animation preferences. Include text overlay positioning guidelines.</action>
+      <output>Typography specification</output>
+    </step>
+
+    <step id="4" name="define_cinematic_style">
+      <action>Define the cinematic visual style: overall aesthetic (photorealistic, stylized, animated, mixed), camera language preferences (static, handheld, dolly, drone), default shot compositions (rule of thirds, centered, symmetrical), transition styles between scenes, depth of field preferences, and motion characteristics (smooth, kinetic, contemplative).</action>
+      <output>Cinematic style specification</output>
+    </step>
+
+    <step id="5" name="define_lighting_preference">
+      <action>Define lighting preferences: primary lighting style (natural, studio, dramatic, flat), time-of-day defaults, shadow intensity, highlight treatment, color temperature range (warm/cool/neutral), and any scene-specific lighting overrides. Include lighting keywords for AI prompt engineering.</action>
+      <output>Lighting preference specification</output>
+    </step>
+
+    <step id="6" name="create_style_tokens">
+      <action>Create VEO and Nano Banana compatible style tokens: a master style prefix (prepended to all prompts), per-scene-type style tokens (intro, content, transition, outro), quality tokens (resolution, detail level), and atmosphere tokens (mood, environment). Each token set must be under 200 characters to leave room for scene-specific content within the 1024 token limit.</action>
+      <output>Style token library for VEO and Nano Banana</output>
+    </step>
+
+    <step id="7" name="define_negative_prompts">
+      <action>Create comprehensive negative prompt lists: global negatives (apply to all generations), character-specific negatives (prevent common AI artifacts), style-specific negatives (prevent style drift), and quality negatives (prevent low-quality outputs). Include common AI generation artifacts to avoid: extra limbs, text artifacts, watermarks, blurriness, inconsistent lighting.</action>
+      <output>Negative prompt library organized by category</output>
+    </step>
+
+    <step id="8" name="output_style_guide">
+      <action>Assemble the complete style-guide.yaml file with all sections: color_palette, typography, cinematic_style, lighting, style_tokens (veo_prefix, nb_prefix, scene_type_tokens), negative_prompts (global, character, style, quality), and metadata. Validate that all token combinations stay within prompt length limits.</action>
+      <output>Complete style-guide.yaml file</output>
+    </step>
+
+    <step id="9" name="save_and_link">
+      <action>Save the style guide to episodes/{episode_id}/style/style-guide.yaml. Create a reference link from the SSD (if it exists) to this style guide. Log the style guide version and creation timestamp.</action>
+      <output>Saved style guide with SSD linkage</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All style guide sections are complete with no empty fields</gate>
+    <gate>Style tokens are specific, actionable, and AI-generation compatible</gate>
+    <gate>Negative prompts are comprehensive and cover common AI artifacts</gate>
+    <gate>Color palette aligns with brand guidelines</gate>
+    <gate>Token combinations stay within 1024 token prompt limits</gate>
+    <gate>Style guide saved and linked from SSD</gate>
+  </quality-gates>
+</instructions>

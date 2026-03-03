@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>cost-status</workflow>
+    <description>Display current cost status versus estimate and project budget</description>
+    <agent>producer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_episode_costs">
+      <action>Load the cost estimate for the current episode from _cost/estimates/{episode_id}-estimate.yaml. Load the cost actuals from _cost/actuals/{episode_id}-actuals.yaml. If the estimate file does not exist, note that no estimate is available and display actuals only. If the actuals file does not exist, report that no costs have been incurred yet.</action>
+      <output>Episode cost estimate and actuals data loaded</output>
+    </step>
+
+    <step id="2" name="calculate_episode_status">
+      <action>Calculate: total spent (sum of all actual transactions), estimated total, remaining (estimated - spent), percentage used ((spent / estimated) * 100), variance (spent - estimated). Break down by tool: for each tool (veo, nano_banana, elevenlabs), calculate estimated vs actual cost and percentage used. Flag any tool where actual exceeds estimate.</action>
+      <output>Episode-level cost calculations with per-tool breakdown</output>
+    </step>
+
+    <step id="3" name="calculate_retake_costs">
+      <action>From the actuals data, filter transactions where is_retake is true. Calculate: total retake count, total retake cost, retake cost as percentage of total spend. Count scenes complete (scenes with at least one successful non-retake generation) versus total scenes in the SSD.</action>
+      <output>Retake cost summary and scene completion count</output>
+    </step>
+
+    <step id="4" name="load_project_budget">
+      <action>If project-config.yaml exists, load the project-level budget: total_project_budget, per_episode_budget, alert_at_percent, halt_at_percent. Scan all _cost/actuals/*.yaml files to calculate total project spending across all episodes. Calculate project budget utilization: total project spend / total_project_budget. Determine budget status: on-track, warning (at alert_at_percent), or halt (at halt_at_percent).</action>
+      <output>Project-level budget status</output>
+    </step>
+
+    <step id="5" name="display_cost_report">
+      <action>Display a formatted cost status report with the following sections: Episode header (ID, title, budget status indicator), Estimated vs Spent vs Remaining with percentage, By-tool breakdown with per-tool percentage and over-estimate warnings, Retake summary (count and cost), Scene completion progress, and if in project mode: project-level budget status with per-episode spending summary. Use clear formatting with aligned columns and status indicators (on track, warning, over estimate).</action>
+      <output>Formatted cost status displayed to user</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Episode cost estimate loaded (or noted as unavailable)</gate>
+    <gate>Episode cost actuals loaded and summed correctly</gate>
+    <gate>Per-tool breakdown calculated with variance indicators</gate>
+    <gate>Retake costs separated from initial generation costs</gate>
+    <gate>Project-level budget status calculated if project-config.yaml exists</gate>
+    <gate>Formatted report displayed with clear status indicators</gate>
+  </quality-gates>
+</instructions>

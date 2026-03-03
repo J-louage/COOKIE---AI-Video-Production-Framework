@@ -1,0 +1,35 @@
+name: validate-script
+workflow_id: validate-script
+module: production
+agent: screenwriter
+slash_command: /production-validate-script
+description: "Validate and normalize user-provided script to canonical format"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/1-ideation/validate-script"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/prompt-engineering.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "script_matches_canonical_template == true"
+    - check: "all_required_sections_present == true"
+    - check: "character_names_resolved == true"
+    - check: "timing_feasible == true"
+
+input_file_patterns:
+  format_presets:
+    path: "{project-root}/_cookie/_config/format-presets.yaml"
+    load_strategy: "FULL_LOAD"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"
+  canonical_template:
+    path: "{project-root}/_cookie/production/templates/canonical-script-template.md"
+    load_strategy: "FULL_LOAD"

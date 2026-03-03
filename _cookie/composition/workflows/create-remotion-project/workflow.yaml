@@ -1,0 +1,26 @@
+name: create-remotion-project
+workflow_id: create-remotion-project
+module: composition
+agent: motion-designer
+slash_command: /composition-create-remotion-project
+description: "Scaffold and configure a new Remotion project from an episode format template"
+config_source: "{project-root}/_cookie/composition/config.yaml"
+installed_path: "{project-root}/_cookie/composition/workflows/create-remotion-project"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/remotion/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "template_determined == true"
+    - check: "project_scaffolded == true"
+    - check: "remotion_config_set == true"
+    - check: "asset_references_configured == true"
+    - check: "dependencies_installed == true"
+    - check: "preview_starts_successfully == true"

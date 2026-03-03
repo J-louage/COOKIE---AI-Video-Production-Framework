@@ -1,0 +1,93 @@
+# Instagram Reels Encoding Preset
+# Vertical 9:16 format at 1080x1920 for Instagram Reels.
+# Constrained to 100MB maximum file size — use two-pass encoding for longer videos.
+# Instagram aggressively re-compresses uploads, so high source quality is important.
+
+preset_name: "instagram-reels"
+platform: "Instagram"
+description: "Instagram Reels — 9:16 vertical at 1080p, constrained to 100MB file size limit with 90-second maximum duration"
+
+resolution:
+  width: 1080
+  height: 1920
+
+aspect_ratio: "9:16"
+frame_rate: 30
+
+codec_settings:
+  video_codec: "libx264"
+  pixel_format: "yuv420p"
+  crf: 23
+  preset: "medium"
+  profile: "high"
+  level: "4.0"
+
+audio_settings:
+  codec: "aac"
+  bitrate: "128k"
+  sample_rate: 44100
+  channels: 2
+
+constraints:
+  max_bitrate: null
+  bufsize: null
+  max_file_size: "100MB"
+  max_duration: 90         # 90 seconds maximum for Reels
+
+ffmpeg_command: >-
+  ffmpeg -i {input}
+  -t 90
+  -c:v libx264 -pix_fmt yuv420p -crf 23 -preset medium
+  -profile:v high -level:v 4.0
+  -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"
+  -c:a aac -b:a 128k -ar 44100 -ac 2
+  -movflags +faststart
+  {output}.mp4
+
+# Crop from 16:9 source (center crop, no letterbox):
+ffmpeg_command_crop: >-
+  ffmpeg -i {input}
+  -t 90
+  -c:v libx264 -pix_fmt yuv420p -crf 23 -preset medium
+  -profile:v high -level:v 4.0
+  -vf "crop=ih*9/16:ih,scale=1080:1920"
+  -c:a aac -b:a 128k -ar 44100 -ac 2
+  -movflags +faststart
+  {output}.mp4
+
+# Two-pass encoding for file size constraint:
+# Use when CRF encoding exceeds the 100MB limit.
+#
+# Step 1: Calculate target video bitrate
+#   target_bitrate = (100 * 1024 * 1024 * 8 - 128000 * duration) / duration
+#   For 90s: target_bitrate ≈ 9.2 Mbps
+#   For 60s: target_bitrate ≈ 13.8 Mbps
+#
+# Step 2: Two-pass encode
+ffmpeg_command_two_pass_1: >-
+  ffmpeg -y -i {input}
+  -t 90
+  -c:v libx264 -pix_fmt yuv420p -preset medium
+  -b:v {target_bitrate}
+  -vf "crop=ih*9/16:ih,scale=1080:1920"
+  -pass 1 -an
+  -f null /dev/null
+
+ffmpeg_command_two_pass_2: >-
+  ffmpeg -y -i {input}
+  -t 90
+  -c:v libx264 -pix_fmt yuv420p -preset medium
+  -b:v {target_bitrate}
+  -vf "crop=ih*9/16:ih,scale=1080:1920"
+  -pass 2
+  -c:a aac -b:a 128k -ar 44100 -ac 2
+  -movflags +faststart
+  {output}.mp4
+
+# Notes:
+# - Instagram re-compresses all uploads; providing high quality source minimizes generation loss
+# - -t 90 enforces the 90-second Reels duration limit
+# - 1080x1920 is the maximum resolution Instagram will display for Reels
+# - If the CRF-encoded file exceeds 100MB, switch to two-pass encoding
+# - The scale+pad filter handles non-9:16 input; use crop variant to fill the frame
+# - Audio at 44100 Hz is standard for Instagram (not 48000)

@@ -1,0 +1,36 @@
+name: script-review
+workflow_id: script-review
+module: production
+agent: screenwriter
+slash_command: /production-script-review
+description: "Review script for narrative, brand, and technical feasibility"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/1-ideation/script-review"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/prompt-engineering.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "narrative_coherent == true"
+    - check: "brand_aligned == true"
+    - check: "technically_feasible == true"
+    - check: "cost_reasonable == true"
+    - check: "review_decision_recorded == true"
+
+input_file_patterns:
+  canonical_script:
+    path: "{project-root}/episodes/{episode_id}/script/canonical-script.md"
+    load_strategy: "FULL_LOAD"
+  brand_guidelines:
+    path: "{project-root}/_cookie/_config/brand-guidelines.yaml"
+    load_strategy: "FULL_LOAD"
+  format_presets:
+    path: "{project-root}/_cookie/_config/format-presets.yaml"
+    load_strategy: "FULL_LOAD"

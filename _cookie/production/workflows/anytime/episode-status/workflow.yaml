@@ -1,0 +1,21 @@
+name: episode-status
+workflow_id: episode-status
+module: production
+agent: director
+slash_command: /production-episode-status
+description: "Display comprehensive episode production status and project overview"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/anytime/episode-status"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills: []
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "production_state_loaded == true"
+    - check: "progress_displayed == true"

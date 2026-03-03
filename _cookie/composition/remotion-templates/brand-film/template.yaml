@@ -1,0 +1,51 @@
+name: brand-film
+description: >
+  Cinematic brand film template designed for long-form brand storytelling.
+  Supports sequential scene composition with video sources, overlay graphics,
+  and music-driven pacing. Optimised for hero videos, brand anthems, and
+  high-production-value content.
+
+format: brand-film
+aspect_ratio: "16:9"
+
+defaults:
+  fps: 30
+  width: 1920
+  height: 1080
+  min_duration_seconds: 60
+  max_duration_seconds: 300
+
+transitions:
+  default: cross-dissolve
+  supported:
+    - cross-dissolve
+    - fade-in
+    - fade-out
+    - fade-from-black
+    - fade-to-black
+    - wipe-left
+    - wipe-right
+  default_duration_frames: 20
+
+supported_overlays:
+  - lower-third
+  - title-card
+  - text-overlay
+  - logo-watermark
+
+text_density: minimal
+music_driven: true
+
+scenes:
+  min: 2
+  max: 20
+  structure:
+    - type: intro
+      recommended_duration_seconds: 5-10
+      suggested_overlay: title-card
+    - type: body
+      recommended_duration_seconds: 10-60
+      suggested_overlay: lower-third
+    - type: outro
+      recommended_duration_seconds: 5-15
+      suggested_overlay: title-card

@@ -1,0 +1,167 @@
+# COOKIE Scene Specification Document (SSD) Template
+# This is the central production contract — every agent reads from and writes to this document.
+# Every field maps directly to a tool parameter.
+
+episode_id: ""                          # e.g., "EP-001"
+episode_title: ""                       # e.g., "Hotel Check-In Experience"
+total_duration_seconds: 0               # Sum of all scene durations
+scene_count: 0                          # Total number of scenes
+resolution_profile: "standard"          # draft | standard | hd | 4k
+primary_format: "brand-film"            # brand-film | product-demo | explainer | social-short | social-square
+primary_aspect_ratio: "16:9"            # 16:9 | 9:16 | 1:1
+
+# Global style applied to all scenes (can be overridden per scene)
+global_style:
+  style_guide: ""                       # ref: path to style-guide.yaml
+  color_palette: ""                     # Palette name from style guide
+  veo_model: "veo-3.0-generate-001"     # VEO model to use (VEO 3.1)
+  veo_speed: "fast"                     # fast | standard
+  nano_banana_model: "gemini-3.1-flash-image-preview"
+  negative_prompt_global: "blurry, low quality, watermark, text, distorted"
+
+scenes:
+  # --- EXAMPLE: Simple single-clip VEO scene ---
+  - scene_id: ""                        # e.g., "SC-001" — unique within episode
+    scene_type: "veo-generated"         # veo-generated | screen-recording | static-image | text-overlay | remotion-only
+    title: ""                           # Short descriptive title
+    description: ""                     # What happens in this scene
+    duration_seconds: 8                 # Total scene duration (must match VEO clip durations)
+    priority: "essential"               # essential | important | supplementary
+    short_form_hook: false              # Can this scene work as a social media hook?
+
+    # VEO configuration (for single-clip scenes)
+    veo:
+      input_mode: "text-to-video"       # text-to-video | image-to-video | interpolation
+      prompt: ""                        # Full prompt with [character:X] [outfit:Y] placeholders
+      negative_prompt: ""               # Scene-specific negative prompt (added to global)
+      duration: 8                       # 4 | 6 | 8 (for veo-3.0-generate-001); 5 | 6 | 7 | 8 (for veo-2.0)
+      aspect_ratio: "16:9"             # 16:9 | 9:16
+      resolution: "720p"               # 720p | 1080p | 4k (from resolution profile)
+      speed: "fast"                     # fast | standard
+      person_generation: "dont_allow"   # allow_all | allow_adult | dont_allow
+      reference_images: []              # Up to 3 images (VEO 3.1 only)
+        # - image: "ref:characters/name/styles/realistic/reference-front.png"
+        #   reference_type: "asset"
+      character_refs: []                # Character IDs appearing in this scene
+
+    # Audio configuration
+    audio:
+      veo_native_audio: true            # Let VEO generate ambient audio (VEO 3.1 only)
+      narration:                        # null if no narration
+        text: ""                        # Narration text
+        character_ref: ""               # Character ID for voice (e.g., "narrator")
+        timing:
+          start_seconds: 0.0            # When narration begins within scene
+      music:
+        track: ""                       # ref: path to music file, or null
+        volume: 0.6                     # 0.0 to 1.0
+        fade_in: 0.0                    # Fade-in duration in seconds
+        fade_out: 0.0                   # Fade-out duration in seconds
+      sfx: []                           # Sound effects list
+        # - sound: "door-opening"
+        #   timing: { at_seconds: 1.0 }
+        #   volume: 0.5
+
+    # Remotion composition overlays
+    remotion:
+      text_overlays: []
+        # - text: "Title Text"
+        #   font: "Inter"
+        #   weight: 700
+        #   size: 64
+        #   color: "#FFFFFF"
+        #   position: { x: "center", y: "center" }
+        #   animation: "fade-in-up"     # fade-in | fade-in-up | slide-in-left | typewriter | bounce
+        #   timing: { in_seconds: 1.0, out_seconds: 5.0 }
+      transitions:
+        in: "cut"                       # cut | fade-from-black | cross-dissolve | wipe-left | wipe-right
+        out: "cut"                      # cut | fade-to-black | cross-dissolve | wipe-left | wipe-right
+      subtitles:
+        enabled: false
+        style: "minimal-bottom"         # minimal-bottom | tiktok-center | karaoke
+
+    # Post-processing (FFmpeg filters applied after composition)
+    post_processing: []
+      # - filter: "color_grade"
+      #   params: { lut: "ref:path/to/lut.cube" }
+
+    # Cost estimate (auto-calculated by cost-estimate task)
+    estimated_cost:
+      veo: 0.00
+      nano_banana: 0.00
+      elevenlabs: 0.00
+      scene_total: 0.00
+
+  # --- EXAMPLE: Multi-clip VEO scene (duration > 8s) ---
+  # - scene_id: "SC-002"
+  #   scene_type: "veo-generated"
+  #   title: "Character walks through lobby"
+  #   description: "Multi-clip scene requiring first/last frame continuity"
+  #   duration_seconds: 16              # 2 x 8s clips
+  #   priority: "essential"
+  #   short_form_hook: false
+  #
+  #   clips:                            # Array of clips for multi-clip scenes
+  #     - clip_id: "SC-002-A"
+  #       veo:
+  #         input_mode: "image-to-video"
+  #         prompt: "[character:marcus] [outfit:business-suit] enters lobby..."
+  #         duration: 8
+  #         aspect_ratio: "16:9"
+  #         resolution: "720p"
+  #         speed: "fast"
+  #         person_generation: "allow_all"
+  #         reference_images:
+  #           - image: "ref:characters/marcus/styles/realistic/reference-front.png"
+  #             reference_type: "asset"
+  #       first_frame:
+  #         source: "nano-banana"       # nano-banana | extract
+  #         prompt: "[character:marcus] [outfit:business-suit] at door..."
+  #         resolution: "2K"
+  #
+  #     - clip_id: "SC-002-B"
+  #       veo:
+  #         input_mode: "interpolation"
+  #         prompt: "[character:marcus] walks across lobby..."
+  #         duration: 8
+  #         aspect_ratio: "16:9"
+  #         resolution: "720p"
+  #         speed: "fast"
+  #         person_generation: "allow_all"
+  #       first_frame:
+  #         source: "extract"           # Extract last frame from previous clip
+  #         extract_from: "ref:assets/SC-002/clip-A.mp4"
+  #       last_frame:
+  #         source: "nano-banana"
+  #         prompt: "[character:marcus] arriving at reception..."
+  #         resolution: "2K"
+  #
+  #   merge_strategy: "ffmpeg-concat"   # ffmpeg-concat | crossfade
+  #
+  #   audio: { ... }
+  #   remotion: { ... }
+  #   estimated_cost: { ... }
+
+  # --- EXAMPLE: Screen recording scene ---
+  # - scene_id: "SC-003"
+  #   scene_type: "screen-recording"
+  #   title: "Product Demo"
+  #   description: "Screen recording of the app interface"
+  #   duration_seconds: 12
+  #   priority: "essential"
+  #
+  #   playwright:
+  #     url: "https://example.com"
+  #     viewport: { width: 1920, height: 1080 }
+  #     actions:
+  #       - { type: "wait", duration: 1000 }
+  #       - { type: "click", selector: "#button", delay: 500 }
+  #       - { type: "type", selector: "#input", text: "Hello", delay: 100 }
+  #       - { type: "scroll", direction: "down", amount: 300, duration: 1000 }
+  #     record_duration: 12000
+  #     annotations:
+  #       - { type: "highlight-click", at_action: 1 }
+  #       - { type: "callout", text: "Click here", at_action: 1, position: "right" }
+  #
+  #   audio: { ... }
+  #   estimated_cost: { ... }

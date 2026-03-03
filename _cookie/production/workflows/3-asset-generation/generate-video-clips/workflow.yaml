@@ -1,0 +1,48 @@
+name: generate-video-clips
+workflow_id: generate-video-clips
+module: production
+agent: cinematographer
+slash_command: /production-generate-video-clips
+description: "Generate video clips via VEO API following SSD and dependency graph"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/3-asset-generation/generate-video-clips"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/veo/SKILL.md"
+  - "{project-root}/_cookie/skills/nano-banana/SKILL.md"
+  - "{project-root}/_cookie/skills/image-editing/SKILL.md"
+  - "{project-root}/_cookie/skills/ffmpeg/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "all_clips_generated == true"
+    - check: "durations_match_ssd == true"
+    - check: "resolutions_correct == true"
+    - check: "multi_clip_scenes_merged == true"
+    - check: "cost_within_budget == true"
+
+input_file_patterns:
+  ssd:
+    path: "{project-root}/episodes/{episode_id}/ssd/scene-spec.yaml"
+    load_strategy: "FULL_LOAD"
+  dependency_graph:
+    path: "{project-root}/episodes/{episode_id}/planning/dependency-graph.yaml"
+    load_strategy: "FULL_LOAD"
+  prompt_library:
+    path: "{project-root}/episodes/{episode_id}/prompts/prompt-library.yaml"
+    load_strategy: "FULL_LOAD"
+  characters:
+    path: "{project-root}/characters/"
+    load_strategy: "INDEX_GUIDED"
+  frames:
+    path: "{project-root}/episodes/{episode_id}/assets/frames/"
+    load_strategy: "INDEX_GUIDED"
+  budget:
+    path: "{project-root}/_cookie/_config/budget-limits.yaml"
+    load_strategy: "FULL_LOAD"

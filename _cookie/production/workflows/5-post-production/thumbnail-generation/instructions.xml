@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>thumbnail-generation</workflow>
+    <description>Generate platform-specific thumbnails from representative video frames with brand overlay</description>
+    <agent>editor</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="identify_hook_scenes">
+      <action>Analyze the SSD to identify hook scenes (scenes tagged as hook, intro, or high-impact). These scenes typically contain the most visually compelling content for thumbnails. If no scenes are explicitly tagged, select the first scene and any scenes marked with high visual_impact scores. Identify 2 to 3 candidate scenes for thumbnail extraction.</action>
+      <output>List of 2 to 3 candidate hook scenes for thumbnail extraction</output>
+    </step>
+
+    <step id="2" name="extract_representative_frame">
+      <action>For each candidate scene, extract a representative frame using FFmpeg. Select the frame at the visual peak of the scene (typically 30 to 50 percent through the scene duration). Use ffmpeg -ss {timestamp} -i {video} -frames:v 1 -q:v 2 {output}.png to extract a high-quality PNG frame. Evaluate each extracted frame for visual clarity, composition, and absence of motion blur. Select the best frame as the primary thumbnail base.</action>
+      <output>Extracted representative frame (PNG) for thumbnail base</output>
+    </step>
+
+    <step id="3" name="apply_brand_overlay">
+      <action>Apply brand overlay elements to the selected frame. Add the episode title text with brand font, size, and color. Apply a subtle gradient or darkened region behind the title text for readability. Optionally add the channel logo or watermark in a consistent position. Apply any brand-specific visual treatment (color grading, vignette, border). Ensure the overlay enhances visual appeal without obscuring the key visual content.</action>
+      <output>Thumbnail with brand overlay applied</output>
+    </step>
+
+    <step id="4" name="resize_per_platform">
+      <action>Resize the branded thumbnail for each target platform. YouTube: 1280x720 pixels (16:9). Instagram Post: 1080x1080 pixels (1:1, center-crop or recompose). TikTok: 1080x1920 pixels (9:16, center-crop or recompose). Use high-quality resampling (lanczos). For aspect ratio changes, use smart cropping to preserve the key visual area and title text. Adjust title text position if needed for non-native aspect ratios.</action>
+      <output>Platform-specific thumbnail files at correct dimensions</output>
+    </step>
+
+    <step id="5" name="save_thumbnails">
+      <action>Save all generated thumbnails to episodes/{episode_id}/exports/thumbnails/. Use the naming convention: {episode_id}-thumb-{platform}-{timestamp}.png. Save in PNG format for maximum quality. Also generate JPEG versions at 85% quality for platforms with file size limits. Create a thumbnail manifest listing all generated files with their dimensions, file sizes, and target platforms.</action>
+      <output>All thumbnails saved with manifest</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>2 to 3 hook scenes identified from the SSD</gate>
+    <gate>Representative frames extracted at visual peaks without motion blur</gate>
+    <gate>Brand overlay applied with title text, logo, and visual treatment</gate>
+    <gate>Title text readable against background (gradient or darkened region)</gate>
+    <gate>YouTube thumbnail at 1280x720 pixels</gate>
+    <gate>Instagram thumbnail at 1080x1080 pixels</gate>
+    <gate>TikTok thumbnail at 1080x1920 pixels</gate>
+    <gate>Smart cropping preserves key visual content across aspect ratios</gate>
+    <gate>Thumbnails saved in PNG and JPEG formats with manifest</gate>
+  </quality-gates>
+</instructions>

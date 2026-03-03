@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>generate-music-sfx</workflow>
+    <description>Source and prepare music and sound effects</description>
+    <agent>sound-designer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_ssd_and_extract_audio_refs">
+      <action>Load the SSD and extract all music and SFX references from every scene's audio configuration. For each reference, identify: the asset type (music track or sound effect), the reference path or description, timing requirements (start time, duration, fade in/out), volume level, and whether the asset is a direct file reference or a mood/description that needs sourcing.</action>
+      <output>Music and SFX reference inventory</output>
+    </step>
+
+    <step id="2" name="check_music_library">
+      <action>For each music reference: if it specifies a file path, verify the file exists in shared-assets/music/. Check file format (mp3, wav, aac), duration, and metadata (BPM, key, mood tags). If the reference is a mood description without a specific file, search the shared-assets/music/ library for matching tracks by mood, tempo, and genre tags. Present matches for user selection if multiple candidates exist.</action>
+      <output>Music availability report with matches and gaps</output>
+    </step>
+
+    <step id="3" name="check_sfx_library">
+      <action>For each SFX reference: if it specifies a file path, verify the file exists in shared-assets/sfx/. If the reference is a description (e.g., "whoosh", "click", "ambient rain"), search the shared-assets/sfx/ library for matching effects. Check duration and quality of found effects. If no match is found, flag the SFX as needing manual sourcing or generation.</action>
+      <output>SFX availability report with matches and gaps</output>
+    </step>
+
+    <step id="4" name="flag_missing_items">
+      <action>Compile a list of all music and SFX items that could not be found or matched in the shared assets library. For each missing item: describe what is needed (mood, duration, style for music; effect type and timing for SFX), suggest potential sources (royalty-free libraries, AI music generation services), and indicate the priority level (P0 if the scene cannot function without it, P1 if a substitute could work).</action>
+      <output>Missing items report with sourcing suggestions</output>
+    </step>
+
+    <step id="5" name="copy_to_episode_assets">
+      <action>For all found and matched audio assets, copy (or create symbolic links) to the episode's asset directory: episodes/{episode_id}/assets/audio/music/ for music tracks and episodes/{episode_id}/assets/audio/sfx/ for sound effects. Maintain the original file names and add a mapping file that links SSD scene references to the copied asset paths.</action>
+      <output>Audio assets copied to episode directory with mapping file</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All referenced music files exist in shared-assets/music/ or are flagged as missing</gate>
+    <gate>All referenced SFX files exist in shared-assets/sfx/ or are flagged as missing</gate>
+    <gate>Found assets are copied or linked to the episode assets directory</gate>
+    <gate>Missing items are flagged with descriptions and sourcing suggestions</gate>
+    <gate>Audio asset mapping file created linking SSD references to file paths</gate>
+    <gate>Audio formats are compatible with the Remotion pipeline</gate>
+  </quality-gates>
+</instructions>

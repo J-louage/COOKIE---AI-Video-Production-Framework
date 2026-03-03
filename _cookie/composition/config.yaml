@@ -1,0 +1,6 @@
+# COOKIE Composition Module Configuration
+module_name: "composition"
+inherits: "_config/global.yaml"
+agents: ["motion-designer", "editor"]
+remotion_templates_path: "remotion-templates/"
+ffmpeg_presets_path: "ffmpeg-presets/"

@@ -1,0 +1,21 @@
+name: cost-status
+workflow_id: cost-status
+module: production
+agent: producer
+slash_command: /production-cost-status
+description: "Display current cost status versus estimate and project budget"
+config_source: "{project-root}/_cookie/production/config.yaml"
+installed_path: "{project-root}/_cookie/production/workflows/anytime/cost-status"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills: []
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "episode_cost_displayed == true"
+    - check: "budget_status_calculated == true"

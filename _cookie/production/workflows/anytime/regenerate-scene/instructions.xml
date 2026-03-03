@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>regenerate-scene</workflow>
+    <description>Regenerate specific scene(s) with revised prompts, cost tracking, and retake counting</description>
+    <agent>cinematographer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="identify_scenes">
+      <action>Receive the scene_id(s) to regenerate from the user. Validate each scene_id exists in the current episode's SSD (scene-spec.yaml). If a scene_id is not found, halt and report the invalid ID. For multi-clip scenes, ask if the user wants to regenerate all clips or a specific clip_id.</action>
+      <output>Validated list of scene_id(s) and optional clip_id(s) to regenerate</output>
+    </step>
+
+    <step id="2" name="load_current_prompts">
+      <action>Load the SSD for the active episode. For each scene to regenerate, extract the current VEO prompt, negative prompt, duration, aspect ratio, resolution, speed, input mode, and any reference images. Display the current prompt to the user.</action>
+      <output>Current prompt and configuration for each scene</output>
+    </step>
+
+    <step id="3" name="prompt_revision">
+      <action>Ask the user: regenerate with the same prompt or provide a revised prompt? If the user provides a revised prompt, update the SSD scene entry and the prompt library with the new prompt. Preserve all other scene settings unless the user explicitly changes them.</action>
+      <output>Final prompt (original or revised) for each scene</output>
+    </step>
+
+    <step id="4" name="cost_gate">
+      <action>Calculate the cost for regenerating the specified scene(s) using pricing.yaml. Show the cost breakdown to the user: per-scene VEO cost, any Nano Banana cost for first/last frame regeneration, and the total. Show the current episode spend and remaining budget. In YOLO mode, auto-approve but still display. In normal mode, require user approval before proceeding.</action>
+      <output>Cost estimate approved for regeneration</output>
+    </step>
+
+    <step id="5" name="regenerate_assets">
+      <action>Re-run asset generation for each specified scene. For single-clip scenes: generate a new video clip via VEO with the final prompt. For multi-clip scenes: regenerate all clips (or the specified clip), extract or generate new first/last frames as needed for continuity, and re-merge clips via FFmpeg concat. Save the new asset with an incremented version counter: video-v{n+1}.mp4 (do not overwrite previous versions).</action>
+      <output>Regenerated video clip(s) saved with version numbers</output>
+    </step>
+
+    <step id="6" name="log_retake">
+      <action>Log each regeneration as a retake in the cost actuals file (_cost/actuals/{episode_id}-actuals.yaml). Set is_retake: true. Ask the user for a retake_reason from the standard codes: character_inconsistency, quality_too_low, wrong_camera_movement, wrong_duration, content_policy, user_preference, audio_artifact, continuity_break. Record the cost, timestamp, scene_id, and tool used.</action>
+      <output>Retake transaction logged in cost actuals</output>
+    </step>
+
+    <step id="7" name="check_retake_limits">
+      <action>Count the total retakes for each regenerated scene. If the count reaches max_retakes_per_scene (default: 3), warn the user and present options: continue (reset counter and allow more retakes), skip (mark scene as skipped and move on), or adjust prompt (modify the prompt and try again — counts as a new generation, not a retake).</action>
+      <output>Retake limit status checked for all regenerated scenes</output>
+    </step>
+
+    <step id="8" name="asset_qa">
+      <action>Run asset QA checks on each regenerated scene: verify duration matches the SSD specification (within 0.5s tolerance), verify resolution and aspect ratio match, verify the video is playable and not corrupted, and check visual consistency with adjacent scenes if applicable. Report QA results.</action>
+      <output>Asset QA results for all regenerated scenes</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>All specified scene_id(s) exist in the SSD</gate>
+    <gate>Revised prompts (if any) saved to SSD and prompt library</gate>
+    <gate>Cost approved before regeneration begins</gate>
+    <gate>Regenerated clips saved with incremented version numbers</gate>
+    <gate>Previous versions preserved (not overwritten)</gate>
+    <gate>Retake logged in cost actuals with is_retake: true and retake_reason</gate>
+    <gate>Retake limits checked and user warned if max reached</gate>
+    <gate>Asset QA passed on all regenerated scenes</gate>
+  </quality-gates>
+</instructions>

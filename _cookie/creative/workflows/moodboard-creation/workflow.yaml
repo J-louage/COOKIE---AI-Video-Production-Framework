@@ -1,0 +1,25 @@
+name: moodboard-creation
+workflow_id: moodboard-creation
+module: creative
+agent: creative-director
+slash_command: /creative-moodboard-creation
+description: "Create visual moodboard with color palette, typography, reference imagery, and style direction"
+config_source: "{project-root}/_cookie/creative/config.yaml"
+installed_path: "{project-root}/_cookie/creative/workflows/moodboard-creation"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/shared/color-theory.md"
+  - "{project-root}/_cookie/skills/nano-banana/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "color_palette_defined == true"
+    - check: "typography_selected == true"
+    - check: "reference_images_generated >= 5"
+    - check: "moodboard_approved == true"

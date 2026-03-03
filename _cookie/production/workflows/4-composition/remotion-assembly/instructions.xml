@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>remotion-assembly</workflow>
+    <description>Assemble video assets into a Remotion project with sequences, transitions, and audio</description>
+    <agent>motion-designer</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_ssd">
+      <action>Load the SSD (scene-spec.yaml) for the current episode. Extract the full scene list, clip references, transition definitions, audio configuration, and total target duration. Verify all referenced video assets exist on disk under episodes/{episode_id}/assets/video/.</action>
+      <output>Validated SSD data with confirmed asset paths</output>
+    </step>
+
+    <step id="2" name="load_or_create_remotion_project">
+      <action>Check if a Remotion project already exists for this episode under episodes/{episode_id}/remotion/. If it exists, load it and verify its configuration. If not, scaffold a new Remotion project using the appropriate template based on the episode format. Run npm install to ensure all dependencies are in place. Verify the project compiles without errors.</action>
+      <output>Ready Remotion project directory with valid configuration</output>
+    </step>
+
+    <step id="3" name="import_video_assets">
+      <action>Import all generated video clips into the Remotion project as staticFile references. Organize assets by scene ID. Verify each imported file is accessible via Remotion staticFile() and that file paths resolve correctly. Log any missing or corrupted files.</action>
+      <output>All video assets registered as staticFile references</output>
+    </step>
+
+    <step id="4" name="create_sequences_per_scene">
+      <action>For each scene defined in the SSD, create a Remotion Sequence component. Set the durationInFrames based on the scene duration and project FPS. Order sequences according to the SSD scene order. Each Sequence should render its corresponding video clip(s) using the OffthreadVideo component.</action>
+      <output>Sequence components created for every scene</output>
+    </step>
+
+    <step id="5" name="apply_transitions">
+      <action>Apply transitions between scenes as specified in the SSD. Supported transition types include: cut (default, no overlap), crossfade (overlap frames with opacity interpolation), fade-to-black, and wipe. Adjust sequence timing to account for transition overlap durations. Verify transitions render correctly in preview.</action>
+      <output>Transitions applied between all adjacent scenes</output>
+    </step>
+
+    <step id="6" name="import_and_sync_audio">
+      <action>Import all audio assets (narration, music, SFX) as staticFile references. Create Audio components for each audio track. Sync narration audio to scene boundaries using timestamps from the SSD. Layer music as a continuous background track. Place SFX at their designated timestamps. Verify audio tracks do not clip or overlap incorrectly.</action>
+      <output>All audio tracks imported and synced to timeline</output>
+    </step>
+
+    <step id="7" name="build_timeline">
+      <action>Assemble the complete Composition component combining all Sequences, transitions, and Audio components. Set the overall composition durationInFrames, FPS, width, and height from the SSD or project config. Ensure the timeline plays through all scenes in order with correct timing.</action>
+      <output>Complete Remotion Composition with full timeline</output>
+    </step>
+
+    <step id="8" name="validate_duration">
+      <action>Verify the total composition duration matches the SSD target duration within a 1-second tolerance. Check that each scene starts and ends at the expected frame. Verify no gaps or unintended overlaps exist between scenes. Run a full preview render at low resolution to confirm the timeline plays correctly end to end.</action>
+      <output>Duration validation report confirming SSD alignment</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Remotion project builds and previews without errors</gate>
+    <gate>All video assets imported and accessible via staticFile</gate>
+    <gate>Every scene has a corresponding Sequence with correct duration</gate>
+    <gate>Transitions match SSD specifications and render correctly</gate>
+    <gate>Audio tracks are imported, layered, and synced to scenes</gate>
+    <gate>Total composition duration matches SSD target within 1s tolerance</gate>
+    <gate>No gaps or unintended overlaps between scenes</gate>
+  </quality-gates>
+</instructions>

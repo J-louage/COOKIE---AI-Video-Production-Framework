@@ -1,0 +1,26 @@
+name: render-final
+workflow_id: render-final
+module: composition
+agent: editor
+slash_command: /composition-render-final
+description: "Render the final full-resolution video from the Remotion composition"
+config_source: "{project-root}/_cookie/composition/config.yaml"
+installed_path: "{project-root}/_cookie/composition/workflows/render-final"
+instructions: "{installed_path}/instructions.xml"
+validation: "{installed_path}/checklist.md"
+
+required_skills:
+  - "{project-root}/_cookie/skills/remotion/SKILL.md"
+  - "{project-root}/_cookie/skills/ffmpeg/SKILL.md"
+
+on_error:
+  missing_file: "ask_user"
+  unresolved_variable: "halt"
+
+quality_gates:
+  post_complete:
+    - check: "resolution_profile_loaded == true"
+    - check: "render_config_set_full_res == true"
+    - check: "render_completed_successfully == true"
+    - check: "output_verified == true"
+    - check: "output_saved_to_exports == true"

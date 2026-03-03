@@ -1,0 +1,6 @@
+# _cookie/_config/agents/director.customize.yaml
+agent_id: "director"
+overrides:
+  communication_style: "casual"
+  preferred_format: "social-short"
+  auto_approve_cost_under: 5.00

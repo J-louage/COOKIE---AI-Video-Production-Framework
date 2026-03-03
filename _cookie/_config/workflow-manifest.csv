@@ -1,0 +1,40 @@
+workflow_id,name,module,phase,path,agent,priority,description
+idea-to-script,Idea to Script,production,1-ideation,production/workflows/1-ideation/idea-to-script,screenwriter,P0,Transform concept/idea into canonical script
+validate-script,Validate Script,production,1-ideation,production/workflows/1-ideation/validate-script,screenwriter,P0,Validate user-provided script and normalize to canonical format
+audio-to-script,Audio to Script,production,1-ideation,production/workflows/1-ideation/audio-to-script,screenwriter,P0,Transcribe audio input and build visual script around narration
+video-extend-plan,Video Extend Plan,production,1-ideation,production/workflows/1-ideation/video-extend-plan,screenwriter,P2,Analyze existing video and plan extension/modification scenes
+script-review,Script Review,production,1-ideation,production/workflows/1-ideation/script-review,creative-director + screenwriter,P0,Creative review of finalized script before pre-production
+create-character-sheet,Create Character Sheet,production,2-pre-production,production/workflows/2-pre-production/create-character-sheet,character-designer,P0,Create/update character identity JSON and multi-angle reference images
+create-style-guide,Create Style Guide,production,2-pre-production,production/workflows/2-pre-production/create-style-guide,character-designer + creative-director,P0,Define visual style and color palette and typography
+create-scene-spec,Create Scene Spec,production,2-pre-production,production/workflows/2-pre-production/create-scene-spec,storyboard-artist,P0,Generate full Scene Specification Document from script
+build-dependency-graph,Build Dependency Graph,production,2-pre-production,production/workflows/2-pre-production/build-dependency-graph,storyboard-artist,P0,Build asset dependency graph and identify parallel/sequential work
+generate-prompt-library,Generate Prompt Library,production,2-pre-production,production/workflows/2-pre-production/generate-prompt-library,prompt-engineer,P0,Create all VEO/Nano Banana prompts with consistency validation
+pre-production-review,Pre-Production Review,production,2-pre-production,production/workflows/2-pre-production/pre-production-review,director + producer,P0,Review SSD and approve cost estimate and character sheets
+generate-character-refs,Generate Character Refs,production,3-asset-generation,production/workflows/3-asset-generation/generate-character-refs,character-designer,P0,Generate multi-angle reference images for all characters
+generate-frames,Generate Frames,production,3-asset-generation,production/workflows/3-asset-generation/generate-frames,cinematographer,P0,Generate first/last frames via Nano Banana for VEO scene continuity
+generate-video-clips,Generate Video Clips,production,3-asset-generation,production/workflows/3-asset-generation/generate-video-clips,cinematographer,P0,Generate video clips via VEO
+generate-narration,Generate Narration,production,3-asset-generation,production/workflows/3-asset-generation/generate-narration,voice-director,P0,Generate narration/dialogue via ElevenLabs per scene
+record-screen-capture,Record Screen Capture,production,3-asset-generation,production/workflows/3-asset-generation/record-screen-capture,demo-producer,P1,Capture screen recordings via Playwright for demo scenes
+generate-music-sfx,Generate Music & SFX,production,3-asset-generation,production/workflows/3-asset-generation/generate-music-sfx,sound-designer,P1,Select/generate music tracks and sound effects
+asset-qa,Asset QA,production,3-asset-generation,production/workflows/3-asset-generation/asset-qa,prompt-engineer + editor,P0,Validate generated assets against SSD
+remotion-assembly,Remotion Assembly,production,4-composition,production/workflows/4-composition/remotion-assembly,motion-designer,P0,Assemble all assets into Remotion composition
+audio-sync,Audio Sync,production,4-composition,production/workflows/4-composition/audio-sync,sound-designer + motion-designer,P0,Synchronize narration and music and SFX with video timeline
+text-animation,Text Animation,production,4-composition,production/workflows/4-composition/text-animation,motion-designer,P0,Add text overlays and lower thirds and title cards and captions
+composition-preview,Composition Preview,production,4-composition,production/workflows/4-composition/composition-preview,editor,P0,Render low-res preview for user review
+final-render,Final Render,production,5-post-production,production/workflows/5-post-production/final-render,editor,P0,Render full-resolution primary format via Remotion
+multi-format-export,Multi-Format Export,production,5-post-production,production/workflows/5-post-production/multi-format-export,editor,P0,Generate derived formats via format adaptation
+subtitle-generation,Subtitle Generation,production,5-post-production,production/workflows/5-post-production/subtitle-generation,editor,P1,Generate and burn-in subtitles/captions
+thumbnail-generation,Thumbnail Generation,production,5-post-production,production/workflows/5-post-production/thumbnail-generation,storyboard-artist,P1,Generate thumbnail images per format
+final-qa,Final QA,production,5-post-production,production/workflows/5-post-production/final-qa,editor,P0,Final quality checklist before delivery
+regenerate-scene,Regenerate Scene,production,anytime,production/workflows/anytime/regenerate-scene,cinematographer + prompt-engineer,P0,Regenerate specific scenes with revised prompts
+cost-status,Cost Status,production,anytime,production/workflows/anytime/cost-status,producer,P0,Show current cost status vs estimate and budget
+episode-status,Episode Status,production,anytime,production/workflows/anytime/episode-status,director,P0,Show episode production status across all phases
+quick-video,Quick Video,production,quick-flow,production/workflows/quick-flow/quick-video,director,P1,Rapid single-video production
+quick-social,Quick Social,production,quick-flow,production/workflows/quick-flow/quick-social,director,P1,Rapid social media clip generation
+create-remotion-project,Create Remotion Project,composition,composition,composition/workflows/create-remotion-project,motion-designer,P0,Scaffold new Remotion project from template for episode
+render-preview,Render Preview,composition,composition,composition/workflows/render-preview,editor,P0,Render low-res preview for review
+render-final,Render Final,composition,composition,composition/workflows/render-final,editor,P0,Render final output at target resolution/format
+brainstorm-concept,Brainstorm Concept,creative,creative,creative/workflows/brainstorm-concept,creative-director,P1,Brainstorm video concepts from brief
+moodboard-creation,Moodboard Creation,creative,creative,creative/workflows/moodboard-creation,creative-director + character-designer,P1,Generate visual moodboard for episode
+brand-alignment-review,Brand Alignment Review,creative,creative,creative/workflows/brand-alignment-review,creative-director,P1,Review video against brand guidelines
+advanced-elicitation,Advanced Elicitation,core,any,core/workflows/advanced-elicitation,director,P1,Structured questioning for ambiguous or incomplete user requests

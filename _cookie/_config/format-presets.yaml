@@ -1,0 +1,96 @@
+# COOKIE Framework — Format Presets
+# Defines output format characteristics for different video types.
+# Referenced by: SSD global_style, episode-config.yaml, format-adapt task
+
+formats:
+  brand-film:
+    aspect_ratio: "16:9"
+    max_duration: 300
+    min_duration: 60
+    target_duration_range: [60, 300]
+    resolution: "1080p"
+    crop_strategy: "none"
+    pacing: "cinematic"
+    pacing_multiplier: 0.9
+    text_density: "minimal"
+    music_driven: true
+    subtitles_default: false
+    requires_hook: false
+    hook_max_duration: 0
+    requires_cta: false
+    cta_position: "end"
+    cta_max_duration: 0
+    priority_filter: [essential, important, supplementary]
+
+  product-demo:
+    aspect_ratio: "16:9"
+    max_duration: 180
+    min_duration: 60
+    target_duration_range: [60, 180]
+    resolution: "1080p"
+    crop_strategy: "none"
+    pacing: "medium"
+    pacing_multiplier: 1.0
+    text_density: "moderate"
+    screen_recording_heavy: true
+    subtitles_default: true
+    requires_hook: false
+    hook_max_duration: 0
+    requires_cta: true
+    cta_position: "end"
+    cta_max_duration: 5
+    priority_filter: [essential, important]
+
+  explainer:
+    aspect_ratio: "16:9"
+    max_duration: 180
+    min_duration: 60
+    target_duration_range: [60, 180]
+    resolution: "1080p"
+    crop_strategy: "none"
+    pacing: "fast"
+    pacing_multiplier: 1.1
+    text_density: "high"
+    subtitles_default: true
+    requires_hook: false
+    hook_max_duration: 0
+    requires_cta: true
+    cta_position: "overlay"
+    cta_max_duration: 5
+    priority_filter: [essential, important]
+
+  social-short:
+    aspect_ratio: "9:16"
+    max_duration: 60
+    min_duration: 15
+    target_duration_range: [15, 60]
+    resolution: "1080p"
+    crop_strategy: "center-subject"
+    pacing: "very-fast"
+    pacing_multiplier: 1.3
+    text_density: "high"
+    requires_hook: true
+    hook_max_duration: 1.5
+    captions_always_on: true
+    requires_cta: true
+    cta_position: "end"
+    cta_max_duration: 3
+    priority_filter: [essential]
+
+  social-square:
+    aspect_ratio: "1:1"
+    max_duration: 60
+    min_duration: 15
+    target_duration_range: [15, 60]
+    resolution: "1080p"
+    crop_strategy: "center-crop"
+    pacing: "fast"
+    pacing_multiplier: 1.2
+    text_density: "high"
+    captions_always_on: true
+    requires_hook: true
+    hook_max_duration: 1.5
+    requires_cta: true
+    cta_position: "overlay"
+    cta_max_duration: 3
+    priority_filter: [essential]

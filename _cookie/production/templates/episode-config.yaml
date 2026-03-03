@@ -1,0 +1,52 @@
+# COOKIE Episode Configuration
+# Created by Director (Christy) when a new episode is started.
+# Inherits defaults from project-config.yaml, which inherits from _config/global.yaml.
+# Override any project-level default by setting a non-null value below.
+
+episode_id: ""                         # e.g., "EP-001"
+title: ""                              # e.g., "Hotel Check-In Experience"
+status: "not-started"                  # not-started | planning | pre-production | in-production | post-production | complete
+created_at: ""                         # ISO-8601 timestamp
+
+overrides:
+  resolution_profile: null             # null = use project default. Options: draft | standard | hd | 4k
+  veo_model: null                      # null = use project default. Options: veo-2.0-generate-001 | veo-3.0-generate-001
+  veo_speed: null                      # null = use project default. Options: fast | standard
+  nano_banana_model: null              # null = use project default. Options: gemini-2.5-flash-image | gemini-3.1-flash-image-preview
+  aspect_ratio: null                   # null = use project default. Options: 16:9 | 9:16
+  person_generation: null              # null = use project default. Options: allow_adult | dont_allow
+
+episode_characters: []                 # Characters specific to this episode (not in shared_characters)
+  # - character_id: "guest"
+  #   path: "ref:characters/guest/"
+
+episode_music: null                    # Default music track for this episode
+
+script:
+  source: "idea"                       # idea | script | audio | video-extension
+  input: ""                            # The idea text, script path, audio path, or video path
+
+format_adaptations:
+  "9:16-720p":
+    max_duration: null
+    essential_scenes_only: false
+    add_captions: false
+    add_hook: false
+  "1:1-720p":
+    max_duration: null
+    crop_strategy: "center-crop"       # center-crop | smart-crop
+
+production_state:
+  script_finalized: false
+  characters_created: false
+  style_guide_created: false
+  ssd_created: false
+  ssd_validated: false
+  cost_approved: false
+  assets_generated: false
+  asset_qa_passed: false
+  composition_assembled: false
+  preview_approved: false
+  final_rendered: false
+  exports_complete: false
+  final_qa_passed: false

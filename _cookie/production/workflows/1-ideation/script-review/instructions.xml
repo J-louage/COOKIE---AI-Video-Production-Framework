@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<instructions>
+  <meta>
+    <workflow>script-review</workflow>
+    <description>Review script for narrative, brand, and technical feasibility</description>
+    <agent>screenwriter</agent>
+  </meta>
+
+  <steps>
+    <step id="1" name="load_canonical_script">
+      <action>Load the canonical script from episodes/{episode_id}/script/canonical-script.md. Parse all sections: header, scenes, visual directions, audio directions, and metadata. Confirm the script is in canonical format before proceeding with review.</action>
+      <output>Loaded and parsed canonical script</output>
+    </step>
+
+    <step id="2" name="load_brand_guidelines">
+      <action>Load brand guidelines from the project configuration. Extract: brand voice and tone rules, visual identity constraints, content restrictions, target audience parameters, approved terminology, and any platform-specific brand requirements.</action>
+      <output>Brand guidelines reference document</output>
+    </step>
+
+    <step id="3" name="review_narrative_coherence">
+      <action>Evaluate the script's narrative structure: Does it have a clear hook within the first 3 seconds (short-form) or 10 seconds (long-form)? Is there a logical flow from introduction through content to conclusion? Are transitions between scenes smooth? Is the pacing appropriate for the format? Are there any narrative gaps or confusing jumps? Rate narrative coherence on a 1-5 scale with specific notes.</action>
+      <output>Narrative coherence assessment with score and notes</output>
+    </step>
+
+    <step id="4" name="review_brand_alignment">
+      <action>Check the script against brand guidelines: Does the tone match the brand voice? Are visual directions consistent with brand identity? Does the content respect any restrictions or sensitivities? Is the language appropriate for the target audience? Are any brand-specific terms used correctly? Rate brand alignment on a 1-5 scale with specific notes.</action>
+      <output>Brand alignment assessment with score and notes</output>
+    </step>
+
+    <step id="5" name="review_pacing_and_hook">
+      <action>Analyze pacing structure: Is the hook compelling enough to retain viewers? Does the content maintain engagement throughout? Are there any dead spots or overly rushed sections? Is the ratio of visual-to-narration appropriate? Are scene durations well-balanced? Assess scroll-stop potential for social media formats.</action>
+      <output>Pacing analysis with engagement predictions</output>
+    </step>
+
+    <step id="6" name="review_technical_feasibility">
+      <action>Assess technical feasibility of all visual and audio directions: Can VEO generate the described scenes within model constraints? Are any scenes too complex for current AI generation capabilities? Are character appearances achievable with available reference images? Are screen recordings feasible with specified URLs and actions? Flag any technically risky or impossible directions.</action>
+      <output>Technical feasibility assessment with risk flags</output>
+    </step>
+
+    <step id="7" name="review_cost_implications">
+      <action>Estimate production cost based on: number of VEO API calls needed, Nano Banana image generations, ElevenLabs narration minutes, multi-clip scene complexity, and any re-generation buffer. Compare against typical budget for this format type. Flag if estimated cost exceeds budget thresholds.</action>
+      <output>Cost estimate with budget comparison</output>
+    </step>
+
+    <step id="8" name="generate_review_notes">
+      <action>Compile all review assessments into a structured review document. Include: overall recommendation (approve/revise), narrative score, brand score, pacing notes, technical risks, cost estimate, and specific revision suggestions if not approved. Prioritize revision suggestions by impact.</action>
+      <output>Complete review document with recommendation</output>
+    </step>
+
+    <step id="9" name="review_gate">
+      <action>Present the review summary to the decision maker. Gate decision: APPROVED means the script proceeds to pre-production. REVISE means the script returns to the screenwriter with specific notes. Record the decision, reviewer identity, timestamp, and any conditions attached to approval.</action>
+      <output>Gate decision record (approved or revise with notes)</output>
+    </step>
+  </steps>
+
+  <quality-gates>
+    <gate>Narrative coherence score is 3 or above on 1-5 scale</gate>
+    <gate>Brand alignment score is 3 or above on 1-5 scale</gate>
+    <gate>Pacing is appropriate for the target format and platform</gate>
+    <gate>All scenes are technically feasible with current generation capabilities</gate>
+    <gate>Estimated cost is within budget thresholds for the format type</gate>
+    <gate>Review decision is recorded with timestamp and reviewer</gate>
+  </quality-gates>
+</instructions>

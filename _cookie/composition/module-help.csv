@@ -1,0 +1,8 @@
+command,description,agent,phase
+cookie-motion,Activate Motion Designer (Felix),motion-designer,composition
+cookie-editor,Activate Editor (Ava),editor,composition
+cookie-remotion-assembly,Assemble assets into Remotion composition,motion-designer,composition
+cookie-audio-sync,Synchronize audio with video timeline,sound-designer + motion-designer,composition
+cookie-text-animation,Add text overlays and captions,motion-designer,composition
+cookie-preview,Render low-res preview for review,editor,composition
+cookie-final-render,Render full-resolution primary format,editor,composition

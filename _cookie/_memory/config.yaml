@@ -1,0 +1,17 @@
+# COOKIE Memory System Configuration
+module_name: "memory"
+sidecars:
+  - agent: "director"
+    path: "director-sidecar/"
+  - agent: "screenwriter"
+    path: "screenwriter-sidecar/"
+  - agent: "character-designer"
+    path: "character-designer-sidecar/"
+  - agent: "prompt-engineer"
+    path: "prompt-engineer-sidecar/"
+  - agent: "cinematographer"
+    path: "cinematographer-sidecar/"
+  - agent: "editor"
+    path: "editor-sidecar/"
+  - agent: "creative-director"
+    path: "creative-director-sidecar/"
