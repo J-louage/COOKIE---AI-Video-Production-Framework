@@ -148,13 +148,13 @@ CURRENT_NAME=$(grep 'user_name:' "$GLOBAL_YAML" | sed 's/.*user_name: *"//' | se
 if [[ -n "$CURRENT_NAME" ]]; then
     info "Current user name: $CURRENT_NAME"
     printf "  Enter your name (press Enter to keep \"$CURRENT_NAME\"): "
-    read -r USER_NAME
+    read -r USER_NAME </dev/tty
     if [[ -z "$USER_NAME" ]]; then
         USER_NAME="$CURRENT_NAME"
     fi
 else
     printf "  Enter your name: "
-    read -r USER_NAME
+    read -r USER_NAME </dev/tty
 fi
 
 if [[ -n "$USER_NAME" ]]; then
@@ -191,32 +191,32 @@ fi
 if [[ -n "$EXISTING_GOOGLE" ]]; then
     info "Google API Key already configured"
     printf "  Replace existing key? (y/N): "
-    read -r REPLACE_GOOGLE
+    read -r REPLACE_GOOGLE </dev/tty
     if [[ "$REPLACE_GOOGLE" =~ ^[Yy]$ ]]; then
         printf "  Google API Key (https://aistudio.google.com/apikey): "
-        read -r GOOGLE_KEY
+        read -r GOOGLE_KEY </dev/tty
     else
         GOOGLE_KEY="$EXISTING_GOOGLE"
     fi
 else
     printf "  Google API Key (https://aistudio.google.com/apikey): "
-    read -r GOOGLE_KEY
+    read -r GOOGLE_KEY </dev/tty
 fi
 
 # ElevenLabs API Key
 if [[ -n "$EXISTING_ELEVEN" ]]; then
     info "ElevenLabs API Key already configured"
     printf "  Replace existing key? (y/N): "
-    read -r REPLACE_ELEVEN
+    read -r REPLACE_ELEVEN </dev/tty
     if [[ "$REPLACE_ELEVEN" =~ ^[Yy]$ ]]; then
         printf "  ElevenLabs API Key (https://elevenlabs.io): "
-        read -r ELEVEN_KEY
+        read -r ELEVEN_KEY </dev/tty
     else
         ELEVEN_KEY="$EXISTING_ELEVEN"
     fi
 else
     printf "  ElevenLabs API Key (https://elevenlabs.io): "
-    read -r ELEVEN_KEY
+    read -r ELEVEN_KEY </dev/tty
 fi
 
 echo ""
