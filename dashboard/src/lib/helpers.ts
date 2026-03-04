@@ -35,7 +35,8 @@ export function statusColor(status: EpisodeStatus): string {
   return map[status] || "bg-gray-100 text-gray-700";
 }
 
-export function productionProgress(state: ProductionState): number {
+export function productionProgress(state?: ProductionState | null): number {
+  if (!state) return 0;
   const entries = Object.values(state);
   if (entries.length === 0) return 0;
   const done = entries.filter(Boolean).length;

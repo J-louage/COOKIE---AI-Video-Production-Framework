@@ -34,16 +34,16 @@ export function EpisodeCostTable({ estimate }: { estimate: CostEstimate }) {
                   {s.scene_id}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatCurrency(s.veo_cost)}
+                  {formatCurrency(s.veo_cost || s.veo || 0)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatCurrency(s.nano_banana_cost)}
+                  {formatCurrency(s.nano_banana_cost || 0)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatCurrency(s.elevenlabs_cost)}
+                  {formatCurrency(s.elevenlabs_cost || 0)}
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  {formatCurrency(s.scene_total)}
+                  {formatCurrency(s.scene_total || s.subtotal || 0)}
                 </TableCell>
               </TableRow>
             ))}
@@ -53,32 +53,34 @@ export function EpisodeCostTable({ estimate }: { estimate: CostEstimate }) {
               <TableRow>
                 <TableCell>Subtotal</TableCell>
                 <TableCell className="text-right">
-                  {formatCurrency(summary.veo_total)}
+                  {formatCurrency(summary.veo_total || 0)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatCurrency(summary.nano_banana_total)}
+                  {formatCurrency(summary.nano_banana_total || 0)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatCurrency(summary.elevenlabs_total)}
+                  {formatCurrency(summary.elevenlabs_total || 0)}
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  {formatCurrency(summary.subtotal)}
+                  {formatCurrency(summary.subtotal || 0)}
                 </TableCell>
               </TableRow>
-              <TableRow>
-                <TableCell colSpan={4}>
-                  Retake Buffer ({summary.retake_buffer_percent}%)
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatCurrency(summary.retake_buffer)}
-                </TableCell>
-              </TableRow>
+              {summary.retake_buffer_percent != null && (
+                <TableRow>
+                  <TableCell colSpan={4}>
+                    Retake Buffer ({summary.retake_buffer_percent}%)
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(summary.retake_buffer || 0)}
+                  </TableCell>
+                </TableRow>
+              )}
               <TableRow>
                 <TableCell colSpan={4} className="font-bold">
                   Estimated Total
                 </TableCell>
                 <TableCell className="text-right font-bold">
-                  {formatCurrency(summary.estimated_total)}
+                  {formatCurrency(summary.estimated_total || 0)}
                 </TableCell>
               </TableRow>
             </TableFooter>

@@ -19,11 +19,11 @@ import {
 interface CostEstimateEntry {
   episodeId: string;
   estimate: {
-    summary: {
-      veo_total: number;
-      nano_banana_total: number;
-      elevenlabs_total: number;
-      estimated_total: number;
+    summary?: {
+      veo_total?: number;
+      nano_banana_total?: number;
+      elevenlabs_total?: number;
+      estimated_total?: number;
     };
   };
 }

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { EmptyState } from "@/components/empty-state";
 import { listCharactersWithIdentity, loadBrandConfig, loadBrandColors, loadBrandFonts } from "@/lib/data/characters";
-import { Users, Palette } from "lucide-react";
+import { Users } from "lucide-react";
 
 export default function CharactersPage() {
   const characters = listCharactersWithIdentity();
@@ -28,6 +28,14 @@ export default function CharactersPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {characters.map((char) => {
               const id = char.identity;
+              // Derive type from voice_config or type field
+              const charType = id?.type
+                || (id?.voice_config?.voice_type === "none" ? "visual-only" : undefined);
+              // Get style names from styles array or available_styles
+              const styleNames = id?.styles?.map((s) => s.style_name)
+                || id?.available_styles
+                || [];
+
               return (
                 <Link key={char.id} href={`/characters/${char.id}`}>
                   <Card className="transition-shadow hover:shadow-md">
@@ -36,7 +44,9 @@ export default function CharactersPage() {
                         <CardTitle className="text-base">
                           {id?.name || char.id}
                         </CardTitle>
-                        <Badge variant="outline">{id?.type || "unknown"}</Badge>
+                        {charType && (
+                          <Badge variant="outline">{charType}</Badge>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {char.id}
@@ -53,17 +63,19 @@ export default function CharactersPage() {
                           {id.description}
                         </p>
                       )}
-                      <div className="mt-2 flex gap-1">
-                        {id?.available_styles?.map((s) => (
-                          <Badge
-                            key={s}
-                            variant="secondary"
-                            className="text-xs"
-                          >
-                            {s}
-                          </Badge>
-                        ))}
-                      </div>
+                      {styleNames.length > 0 && (
+                        <div className="mt-2 flex gap-1">
+                          {styleNames.map((s) => (
+                            <Badge
+                              key={s}
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {s}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </Link>

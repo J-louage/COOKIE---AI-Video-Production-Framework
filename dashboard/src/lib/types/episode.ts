@@ -1,24 +1,55 @@
 export interface EpisodeConfig {
   episode_id: string;
   title: string;
+  slug?: string;
+  format?: string;
+  target_duration?: number;
   status: EpisodeStatus;
-  created_at: string;
-  overrides: {
-    resolution_profile: string | null;
-    veo_model: string | null;
-    veo_speed: string | null;
-    nano_banana_model: string | null;
-    aspect_ratio: string | null;
-    person_generation: string | null;
+
+  // Actual data uses "characters", template uses "episode_characters"
+  characters?: EpisodeCharacterRef[];
+  episode_characters?: EpisodeCharacterRef[];
+
+  // Actual data uses "concept", template uses "script"
+  concept?: {
+    premise?: string;
+    tone?: string;
+    scenes?: string[];
+    text_overlays?: boolean;
+    narration?: boolean;
+    music?: string;
   };
-  episode_characters: EpisodeCharacterRef[];
-  episode_music: string | null;
-  script: {
-    source: string;
-    input: string;
+  script?: {
+    source?: string;
+    input?: string;
   };
-  format_adaptations: Record<string, FormatAdaptation>;
-  production_state: ProductionState;
+
+  // Brand info (episode-level)
+  brand?: {
+    name?: string;
+    website?: string;
+    logo?: string;
+    colors?: Record<string, string>;
+    fonts?: Record<string, string>;
+    tagline?: string;
+    style?: string;
+  };
+
+  overrides?: Record<string, unknown>;
+
+  episode_music?: string | null;
+  format_adaptations?: Record<string, FormatAdaptation>;
+  production_state?: ProductionState;
+
+  metadata?: {
+    created?: string;
+    last_modified?: string;
+    phase?: string;
+    [key: string]: unknown;
+  };
+
+  // Compat: template uses created_at at top level
+  created_at?: string;
 }
 
 export type EpisodeStatus =
@@ -31,7 +62,8 @@ export type EpisodeStatus =
 
 export interface EpisodeCharacterRef {
   character_id: string;
-  path: string;
+  role?: string;
+  path?: string;
 }
 
 export interface FormatAdaptation {
@@ -43,22 +75,23 @@ export interface FormatAdaptation {
 }
 
 export interface ProductionState {
-  script_finalized: boolean;
-  characters_created: boolean;
-  style_guide_created: boolean;
-  ssd_created: boolean;
-  ssd_validated: boolean;
-  cost_approved: boolean;
-  assets_generated: boolean;
-  asset_qa_passed: boolean;
-  composition_assembled: boolean;
-  preview_approved: boolean;
-  final_rendered: boolean;
-  exports_complete: boolean;
-  final_qa_passed: boolean;
+  script_finalized?: boolean;
+  characters_created?: boolean;
+  style_guide_created?: boolean;
+  ssd_created?: boolean;
+  ssd_validated?: boolean;
+  cost_approved?: boolean;
+  assets_generated?: boolean;
+  asset_qa_passed?: boolean;
+  composition_assembled?: boolean;
+  preview_approved?: boolean;
+  final_rendered?: boolean;
+  exports_complete?: boolean;
+  final_qa_passed?: boolean;
+  [key: string]: boolean | undefined;
 }
 
-export const PRODUCTION_STATE_LABELS: Record<keyof ProductionState, string> = {
+export const PRODUCTION_STATE_LABELS: Record<string, string> = {
   script_finalized: "Script Finalized",
   characters_created: "Characters Created",
   style_guide_created: "Style Guide Created",

@@ -4,6 +4,7 @@ import { BudgetSummary } from "@/components/dashboard/budget-summary";
 import { EpisodeCards } from "@/components/dashboard/episode-cards";
 import { loadProjectConfig } from "@/lib/data/project";
 import { listEpisodesWithConfig } from "@/lib/data/episodes";
+import { loadEpisodeSSD } from "@/lib/data/episodes";
 import { listCharacterIds } from "@/lib/data/characters";
 import { loadAllCostEstimates } from "@/lib/data/costs";
 import { formatCurrency } from "@/lib/helpers";
@@ -14,10 +15,12 @@ export default function HomePage() {
   const characterIds = listCharacterIds();
   const costEstimates = loadAllCostEstimates();
 
-  const totalScenes = costEstimates.reduce(
-    (sum, e) => sum + (e.estimate.summary?.total_scenes || 0),
-    0
-  );
+  // Count scenes from SSDs
+  const totalScenes = episodes.reduce((sum, ep) => {
+    const ssd = loadEpisodeSSD(ep.id);
+    return sum + (ssd?.metadata?.total_scenes || ssd?.scene_count || ssd?.scenes?.length || 0);
+  }, 0);
+
   const totalSpent = costEstimates.reduce(
     (sum, e) => sum + (e.estimate.summary?.estimated_total || 0),
     0

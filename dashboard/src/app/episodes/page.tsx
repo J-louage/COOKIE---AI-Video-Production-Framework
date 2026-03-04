@@ -12,7 +12,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { EmptyState } from "@/components/empty-state";
 import { listEpisodesWithConfig } from "@/lib/data/episodes";
-import { statusColor, productionProgress } from "@/lib/helpers";
+import { statusColor, productionProgress, formatDuration } from "@/lib/helpers";
 import { Film } from "lucide-react";
 
 export default function EpisodesPage() {
@@ -34,7 +34,8 @@ export default function EpisodesPage() {
                 <TableHead>ID</TableHead>
                 <TableHead>Title</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Source</TableHead>
+                <TableHead>Format</TableHead>
+                <TableHead>Duration</TableHead>
                 <TableHead>Progress</TableHead>
               </TableRow>
             </TableHeader>
@@ -42,9 +43,7 @@ export default function EpisodesPage() {
               {episodes.map((ep) => {
                 const c = ep.config;
                 const status = c?.status || "not-started";
-                const progress = c?.production_state
-                  ? productionProgress(c.production_state)
-                  : 0;
+                const progress = productionProgress(c?.production_state);
                 return (
                   <TableRow key={ep.id}>
                     <TableCell className="font-mono text-sm">
@@ -62,7 +61,10 @@ export default function EpisodesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {c?.script?.source || "—"}
+                      {c?.format || "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {c?.target_duration ? formatDuration(c.target_duration) : "—"}
                     </TableCell>
                     <TableCell className="w-[140px]">
                       <div className="flex items-center gap-2">

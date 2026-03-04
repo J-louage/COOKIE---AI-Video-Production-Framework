@@ -23,9 +23,7 @@ export function EpisodeCards({ episodes }: { episodes: EpisodeSummary[] }) {
       {episodes.map((ep) => {
         const config = ep.config;
         const status = config?.status || "not-started";
-        const progress = config?.production_state
-          ? productionProgress(config.production_state)
-          : 0;
+        const progress = productionProgress(config?.production_state);
 
         return (
           <Link key={ep.id} href={`/episodes/${ep.id}`}>
@@ -42,6 +40,11 @@ export function EpisodeCards({ episodes }: { episodes: EpisodeSummary[] }) {
                 <p className="text-xs text-muted-foreground">{ep.id}</p>
               </CardHeader>
               <CardContent>
+                {config?.concept?.premise && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                    {config.concept.premise}
+                  </p>
+                )}
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Production Progress</span>
                   <span>{progress}%</span>
