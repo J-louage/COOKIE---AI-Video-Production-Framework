@@ -18,10 +18,10 @@ NC='\033[0m' # No Color
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
-info()    { printf "${BLUE}ℹ${NC}  %s\n" "$1"; }
-success() { printf "${GREEN}✓${NC}  %s\n" "$1"; }
-warn()    { printf "${YELLOW}⚠${NC}  %s\n" "$1"; }
-fail()    { printf "${RED}✗${NC}  %s\n" "$1"; }
+info()    { printf "${BLUE}ℹ${NC}  %b\n" "$1"; }
+success() { printf "${GREEN}✓${NC}  %b\n" "$1"; }
+warn()    { printf "${YELLOW}⚠${NC}  %b\n" "$1"; }
+fail()    { printf "${RED}✗${NC}  %b\n" "$1"; }
 
 # ──────────────────────────────────────────────
 # Welcome
@@ -124,51 +124,57 @@ fi
 echo ""
 if [[ "$PULL_UPDATES" =~ ^[Yy]$ ]]; then
     info "Pulling latest changes from COOKIE framework..."
-    if true; then
-        LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "")
-        REMOTE=$(git rev-parse "$FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH" 2>/dev/null || echo "")
 
-        if [[ -z "$LOCAL" ]]; then
-            # Fresh repo with no commits — pull everything
-            info "First-time setup — pulling framework files..."
-            git pull "$FRAMEWORK_REMOTE" "$FRAMEWORK_BRANCH" 2>/dev/null
-            success "Framework files downloaded"
-        elif [[ "$LOCAL" == "$REMOTE" ]]; then
-            success "Already up to date!"
-        else
+    LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "")
+    REMOTE=$(git rev-parse "$FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH" 2>/dev/null || echo "")
+
+    if [[ -z "$LOCAL" ]]; then
+        # Fresh repo with no commits — pull everything
+        info "First-time setup — pulling framework files..."
+        git pull "$FRAMEWORK_REMOTE" "$FRAMEWORK_BRANCH" 2>/dev/null
+        success "Framework files downloaded"
+    else
+        # Stash any local changes before updating
+        STASHED=false
+        if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+            info "Stashing local changes before update..."
+            git stash push -m "cookie-setup: auto-stash before update" --quiet 2>/dev/null && STASHED=true
+        fi
+
+        if [[ "$LOCAL" != "$REMOTE" ]]; then
+            # Normal case: upstream has new commits
             BEHIND=$(git rev-list --count HEAD.."$FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH" 2>/dev/null || echo "0")
             if [[ "$BEHIND" -gt 0 ]]; then
-                info "$BEHIND new commit(s) available — pulling..."
-                # Stash any local changes (e.g. global.yaml edited by previous setup)
-                STASHED=false
-                if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
-                    info "Stashing local changes before update..."
-                    git stash push -m "cookie-setup: auto-stash before update" --quiet 2>/dev/null && STASHED=true
-                fi
-                if git pull --ff-only "$FRAMEWORK_REMOTE" "$FRAMEWORK_BRANCH" 2>/dev/null; then
-                    NEW_VERSION=$(cat VERSION 2>/dev/null | tr -d '[:space:]' || echo "$REMOTE_VERSION")
-                    success "Updated to version ${NEW_VERSION}"
-                else
-                    warn "Could not fast-forward — your local changes may have diverged"
-                    info "You can try: git merge $FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH"
-                fi
-                # Restore stashed changes
-                if [[ "$STASHED" == true ]]; then
-                    info "Restoring your local changes..."
-                    if git stash pop --quiet 2>/dev/null; then
-                        success "Local changes restored"
-                    else
-                        warn "Could not auto-restore — your changes are saved in 'git stash'"
-                        info "Run 'git stash pop' after resolving any conflicts"
-                    fi
-                fi
+                info "$BEHIND new commit(s) available..."
+            fi
+            if git pull --ff-only "$FRAMEWORK_REMOTE" "$FRAMEWORK_BRANCH" 2>/dev/null; then
+                NEW_VERSION=$(cat VERSION 2>/dev/null | tr -d '[:space:]' || echo "$REMOTE_VERSION")
+                success "Updated to version ${NEW_VERSION}"
             else
-                success "Already up to date!"
+                warn "Could not fast-forward — your local changes may have diverged"
+                info "You can try: git merge $FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH"
+            fi
+        elif [[ "$LOCAL_VERSION" == "unknown" ]] || [[ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]]; then
+            # Commit hashes match but working tree is out of sync (e.g. old CLI scaffold)
+            info "Syncing working tree with framework..."
+            git checkout "$FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH" -- . 2>/dev/null
+            git reset HEAD 2>/dev/null
+            NEW_VERSION=$(cat VERSION 2>/dev/null | tr -d '[:space:]' || echo "$REMOTE_VERSION")
+            success "Updated to version ${NEW_VERSION}"
+        else
+            success "Already up to date!"
+        fi
+
+        # Restore stashed changes
+        if [[ "$STASHED" == true ]]; then
+            info "Restoring your local changes..."
+            if git stash pop --quiet 2>/dev/null; then
+                success "Local changes restored"
+            else
+                warn "Could not auto-restore — your changes are saved in 'git stash'"
+                info "Run 'git stash pop' after resolving any conflicts"
             fi
         fi
-    else
-        warn "Could not reach framework remote — continuing with current version"
-        info "Check your internet connection or try again later"
     fi
 else
     info "Skipping update check"
