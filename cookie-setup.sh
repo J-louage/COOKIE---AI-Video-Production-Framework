@@ -341,14 +341,28 @@ if [[ -f "$DASHBOARD_DIR/package.json" ]]; then
             success "Dashboard .env.local created"
         fi
 
-        # Find an available port (default 3000, then try 3001-3009)
+        # Stop any existing dashboard process
         DASHBOARD_PORT=3000
-        for PORT_CANDIDATE in 3000 3001 3002 3003 3004 3005 3006 3007 3008 3009; do
-            if ! lsof -i ":$PORT_CANDIDATE" &>/dev/null; then
-                DASHBOARD_PORT=$PORT_CANDIDATE
-                break
+        if [[ -f "$DASHBOARD_DIR/.dashboard.pid" ]]; then
+            OLD_PID=$(cat "$DASHBOARD_DIR/.dashboard.pid")
+            if kill -0 "$OLD_PID" 2>/dev/null; then
+                info "Stopping existing dashboard (PID $OLD_PID)..."
+                kill "$OLD_PID" 2>/dev/null || true
+                sleep 1
+                # Force kill if still running
+                kill -0 "$OLD_PID" 2>/dev/null && kill -9 "$OLD_PID" 2>/dev/null || true
+                success "Previous dashboard stopped"
             fi
-        done
+            rm -f "$DASHBOARD_DIR/.dashboard.pid"
+        fi
+        # Also kill anything on port 3000 that might be a leftover dashboard
+        EXISTING_PID=$(lsof -ti :3000 2>/dev/null || true)
+        if [[ -n "$EXISTING_PID" ]]; then
+            info "Port 3000 is in use (PID $EXISTING_PID) — stopping it..."
+            kill "$EXISTING_PID" 2>/dev/null || true
+            sleep 1
+            success "Port 3000 freed"
+        fi
 
         # Start the dashboard in the background
         printf "  Would you like to start the dashboard now on port $DASHBOARD_PORT? (Y/n): "
@@ -356,13 +370,14 @@ if [[ -f "$DASHBOARD_DIR/package.json" ]]; then
         echo ""
         if [[ ! "$START_DASHBOARD" =~ ^[Nn]$ ]]; then
             info "Starting dashboard on port $DASHBOARD_PORT..."
-            (cd "$DASHBOARD_DIR" && PORT=$DASHBOARD_PORT npm run dev &>/dev/null &)
+            cd "$DASHBOARD_DIR"
+            PORT=$DASHBOARD_PORT npm run dev &>/dev/null &
             DASHBOARD_PID=$!
+            cd ..
             sleep 3
-            if kill -0 $DASHBOARD_PID 2>/dev/null; then
+            if kill -0 "$DASHBOARD_PID" 2>/dev/null; then
                 success "Dashboard running at http://localhost:$DASHBOARD_PORT"
                 info "The dashboard runs in the background. To stop it: kill $DASHBOARD_PID"
-                # Save PID for reference
                 echo "$DASHBOARD_PID" > "$DASHBOARD_DIR/.dashboard.pid"
             else
                 warn "Dashboard failed to start — run it manually: cd dashboard && npm run dev"
