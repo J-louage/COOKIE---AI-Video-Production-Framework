@@ -32,6 +32,11 @@ export interface CharacterIdentity {
   // Template field — not present in actual data
   type?: "visual-voice" | "visual-only" | "voice-only";
 
+  reference_images?: {
+    character_sheet?: string;
+    [key: string]: string | undefined;
+  };
+
   metadata?: {
     created_at?: string;
     version?: string;
@@ -57,7 +62,7 @@ export interface PhysicalDescription {
     texture?: string;
     length?: string;
   };
-  eyes?: {
+  eyes?: string | {
     color?: string;
     hex?: string;
     expression?: string;

@@ -60,7 +60,7 @@ export default async function CharacterDetailPage({
     >
       <div className="space-y-6">
         {identity.description && (
-          <p className="text-sm text-muted-foreground max-w-2xl">
+          <p className="text-sm text-muted-foreground max-w-prose">
             {identity.description}
           </p>
         )}
@@ -75,15 +75,34 @@ export default async function CharacterDetailPage({
           </div>
         )}
 
+        {/* Character Sheet */}
+        {identity.reference_images?.character_sheet && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Character Sheet</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="relative w-full overflow-hidden rounded-md">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/media/characters/${characterId}/${identity.reference_images.character_sheet}`}
+                  alt={`${identity.name} character sheet`}
+                  className="w-full h-auto rounded-md"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Physical Description (actual data: nested objects) */}
           {physDesc && (
-            <Card>
+            <Card className="sm:col-span-2 lg:col-span-3">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Physical Description</CardTitle>
               </CardHeader>
               <CardContent>
-                <dl className="space-y-2 text-sm">
+                <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-3 text-sm">
                   {physDesc.species && (
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">Species</dt>
@@ -105,7 +124,7 @@ export default async function CharacterDetailPage({
                   {physDesc.build && (
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">Build</dt>
-                      <dd>{physDesc.build}</dd>
+                      <dd className="text-right">{physDesc.build}</dd>
                     </div>
                   )}
                   {physDesc.size && (
@@ -120,50 +139,66 @@ export default async function CharacterDetailPage({
                       <dd>{physDesc.height}</dd>
                     </div>
                   )}
-                  {physDesc.coat && (
-                    <div className="mt-2">
-                      <p className="text-xs text-muted-foreground mb-1">Coat</p>
-                      <div className="space-y-1 text-xs">
-                        {physDesc.coat.color && <p>Color: {physDesc.coat.color}</p>}
-                        {physDesc.coat.texture && <p>Texture: {physDesc.coat.texture}</p>}
-                        {physDesc.coat.length && <p>Length: {physDesc.coat.length}</p>}
-                        {physDesc.coat.hex_primary && (
-                          <div className="flex items-center gap-1">
-                            <div className="h-3 w-3 rounded" style={{ backgroundColor: physDesc.coat.hex_primary }} />
-                            <span>{physDesc.coat.hex_primary}</span>
-                          </div>
-                        )}
-                      </div>
+                  {physDesc.skin_tone && (
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Skin Tone</dt>
+                      <dd>{physDesc.skin_tone}</dd>
                     </div>
                   )}
-                  {physDesc.eyes && (
-                    <div className="mt-2">
-                      <p className="text-xs text-muted-foreground mb-1">Eyes</p>
-                      <div className="space-y-1 text-xs">
-                        {physDesc.eyes.color && <p>Color: {physDesc.eyes.color}</p>}
-                        {physDesc.eyes.expression && <p>Expression: {physDesc.eyes.expression}</p>}
-                        {physDesc.eyes.hex && (
-                          <div className="flex items-center gap-1">
-                            <div className="h-3 w-3 rounded" style={{ backgroundColor: physDesc.eyes.hex }} />
-                            <span>{physDesc.eyes.hex}</span>
-                          </div>
-                        )}
-                      </div>
+                  {physDesc.hair && (
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Hair</dt>
+                      <dd>{physDesc.hair}</dd>
                     </div>
                   )}
-                </dl>
-                {physDesc.distinguishing_features && physDesc.distinguishing_features.length > 0 && (
+                  {physDesc.eyes && typeof physDesc.eyes === "string" && (
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Eyes</dt>
+                      <dd className="text-right">{physDesc.eyes}</dd>
+                    </div>
+                  )}
+                </div>
+                {physDesc.coat && (
                   <div className="mt-3">
-                    <p className="text-xs text-muted-foreground mb-1">
+                    <p className="text-sm text-muted-foreground mb-1">Coat</p>
+                    <div className="space-y-1 text-sm">
+                      {physDesc.coat.color && <p>Color: {physDesc.coat.color}</p>}
+                      {physDesc.coat.texture && <p>Texture: {physDesc.coat.texture}</p>}
+                      {physDesc.coat.length && <p>Length: {physDesc.coat.length}</p>}
+                      {physDesc.coat.hex_primary && (
+                        <div className="flex items-center gap-1">
+                          <div className="h-3 w-3 rounded" style={{ backgroundColor: physDesc.coat.hex_primary }} />
+                          <span>{physDesc.coat.hex_primary}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {physDesc.eyes && typeof physDesc.eyes === "object" && (
+                  <div className="mt-3">
+                    <p className="text-sm text-muted-foreground mb-1">Eyes</p>
+                    <div className="space-y-1 text-sm">
+                      {physDesc.eyes.color && <p>Color: {physDesc.eyes.color}</p>}
+                      {physDesc.eyes.expression && <p>Expression: {physDesc.eyes.expression}</p>}
+                      {physDesc.eyes.hex && (
+                        <div className="flex items-center gap-1">
+                          <div className="h-3 w-3 rounded" style={{ backgroundColor: physDesc.eyes.hex }} />
+                          <span>{physDesc.eyes.hex}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {physDesc.distinguishing_features && physDesc.distinguishing_features.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-muted-foreground mb-2">
                       Distinguishing Features
                     </p>
-                    <div className="flex flex-wrap gap-1">
+                    <ul className="list-disc list-inside space-y-1 text-sm">
                       {physDesc.distinguishing_features.map((f) => (
-                        <Badge key={f} variant="secondary" className="text-xs">
-                          {f}
-                        </Badge>
+                        <li key={f}>{f}</li>
                       ))}
-                    </div>
+                    </ul>
                   </div>
                 )}
               </CardContent>
