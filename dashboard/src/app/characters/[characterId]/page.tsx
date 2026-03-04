@@ -94,10 +94,9 @@ export default async function CharacterDetailPage({
           </Card>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Physical Description (actual data: nested objects) */}
-          {physDesc && (
-            <Card className="sm:col-span-2 lg:col-span-3">
+        {/* Physical Description (actual data: nested objects) — full width outside grid */}
+        {physDesc && (
+          <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Physical Description</CardTitle>
               </CardHeader>
@@ -202,9 +201,10 @@ export default async function CharacterDetailPage({
                   </div>
                 )}
               </CardContent>
-            </Card>
-          )}
+          </Card>
+        )}
 
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Physical Traits (template-style flat) */}
           {!physDesc && physFlat && (
             <Card>
