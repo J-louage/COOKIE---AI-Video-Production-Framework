@@ -1,7 +1,7 @@
 {
-  "name": "create-cookie-framework",
-  "version": "1.0.0",
-  "description": "Create a new COOKIE AI Video Production Framework project",
+  "name": "create-cookie-video",
+  "version": "1.0.1",
+  "description": "Scaffold a new COOKIE AI video production project with built-in framework updates",
   "bin": "./index.js",
   "keywords": [
     "cookie",
@@ -9,7 +9,9 @@
     "video",
     "production",
     "claude",
-    "veo"
+    "veo",
+    "create",
+    "scaffold"
   ],
   "license": "MIT",
   "repository": {

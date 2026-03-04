@@ -25,6 +25,9 @@ _cookie/_cost/reports/*.yaml
 episodes/*/output/
 episodes/*/assets/generated/
 
+# Characters (project-specific)
+characters/
+
 # Dashboard build output
 dashboard/.next/
 dashboard/.env.local

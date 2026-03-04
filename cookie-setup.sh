@@ -39,7 +39,8 @@ cat << 'BANNER'
   AI Video Production Framework
 BANNER
 printf "${NC}\n"
-echo "  Setup Script v1.0"
+DISPLAY_VERSION=$(cat VERSION 2>/dev/null | tr -d '[:space:]' || echo "1.0.0")
+echo "  Setup Script v${DISPLAY_VERSION}"
 echo "  ─────────────────────────────────────────"
 echo ""
 
@@ -61,7 +62,14 @@ echo ""
 FRAMEWORK_REPO="https://github.com/J-louage/COOKIE---AI-Video-Production-Framework.git"
 FRAMEWORK_REMOTE="cookie-upstream"
 
+# Read local version
+LOCAL_VERSION="unknown"
+if [[ -f "VERSION" ]]; then
+    LOCAL_VERSION=$(cat VERSION | tr -d '[:space:]')
+fi
+
 printf "${BOLD}Check for updates${NC}\n\n"
+info "Local version: ${BOLD}${LOCAL_VERSION}${NC}"
 
 # Initialize git repo if not already one
 if ! git rev-parse --is-inside-work-tree &>/dev/null; then
@@ -82,18 +90,41 @@ elif [[ "$CURRENT_UPSTREAM_URL" != "$FRAMEWORK_REPO" ]]; then
     success "Framework remote URL updated"
 fi
 
-printf "\n  Would you like to pull the latest framework updates? (y/N): "
-read -r PULL_UPDATES </dev/tty
+# Fetch to check remote version before prompting
+REMOTE_VERSION="unknown"
+FRAMEWORK_BRANCH="main"
+if git fetch "$FRAMEWORK_REMOTE" 2>/dev/null; then
+    DETECTED_BRANCH=$(git remote show "$FRAMEWORK_REMOTE" 2>/dev/null | grep "HEAD branch" | awk '{print $NF}')
+    if [[ -n "$DETECTED_BRANCH" ]]; then
+        FRAMEWORK_BRANCH="$DETECTED_BRANCH"
+    fi
+    REMOTE_VERSION=$(git show "$FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH:VERSION" 2>/dev/null | tr -d '[:space:]' || echo "unknown")
+fi
+info "Remote version: ${BOLD}${REMOTE_VERSION}${NC}"
+
+if [[ "$LOCAL_VERSION" == "$REMOTE_VERSION" ]] && [[ "$LOCAL_VERSION" != "unknown" ]]; then
+    echo ""
+    success "You're on the latest version (${LOCAL_VERSION})"
+    PULL_UPDATES="n"
+elif [[ "$REMOTE_VERSION" != "unknown" ]] && [[ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]]; then
+    echo ""
+    warn "Update available: ${LOCAL_VERSION} → ${REMOTE_VERSION}"
+    printf "\n  Would you like to update to ${BOLD}${REMOTE_VERSION}${NC}? (Y/n): "
+    read -r PULL_UPDATES </dev/tty
+    # Default to yes for available updates
+    if [[ -z "$PULL_UPDATES" ]] || [[ "$PULL_UPDATES" =~ ^[Yy]$ ]]; then
+        PULL_UPDATES="y"
+    else
+        PULL_UPDATES="n"
+    fi
+else
+    printf "\n  Would you like to pull the latest framework updates? (y/N): "
+    read -r PULL_UPDATES </dev/tty
+fi
 echo ""
 if [[ "$PULL_UPDATES" =~ ^[Yy]$ ]]; then
-    info "Fetching latest changes from COOKIE framework..."
-    if git fetch "$FRAMEWORK_REMOTE" 2>/dev/null; then
-        # Determine the default branch on the framework remote
-        FRAMEWORK_BRANCH=$(git remote show "$FRAMEWORK_REMOTE" 2>/dev/null | grep "HEAD branch" | awk '{print $NF}')
-        if [[ -z "$FRAMEWORK_BRANCH" ]]; then
-            FRAMEWORK_BRANCH="main"
-        fi
-
+    info "Pulling latest changes from COOKIE framework..."
+    if true; then
         LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "")
         REMOTE=$(git rev-parse "$FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH" 2>/dev/null || echo "")
 
@@ -115,7 +146,8 @@ if [[ "$PULL_UPDATES" =~ ^[Yy]$ ]]; then
                     git stash push -m "cookie-setup: auto-stash before update" --quiet 2>/dev/null && STASHED=true
                 fi
                 if git pull --ff-only "$FRAMEWORK_REMOTE" "$FRAMEWORK_BRANCH" 2>/dev/null; then
-                    success "Updated to latest version"
+                    NEW_VERSION=$(cat VERSION 2>/dev/null | tr -d '[:space:]' || echo "$REMOTE_VERSION")
+                    success "Updated to version ${NEW_VERSION}"
                 else
                     warn "Could not fast-forward — your local changes may have diverged"
                     info "You can try: git merge $FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH"

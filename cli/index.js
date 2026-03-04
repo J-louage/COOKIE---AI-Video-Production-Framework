@@ -74,15 +74,34 @@ if (fs.existsSync(gitDir)) {
   fs.rmSync(gitDir, { recursive: true, force: true });
 }
 
-// Initialize a fresh git repo
+// Initialize a fresh git repo based on upstream history
+// This ensures cookie-setup.sh can fast-forward future updates
 try {
   execSync("git init", { cwd: targetDir, stdio: "ignore" });
+  execSync(`git remote add cookie-upstream "${REPO_URL}"`, {
+    cwd: targetDir,
+    stdio: "ignore",
+  });
+  // Fetch upstream history and reset to it so we share a common ancestor
+  execSync("git fetch cookie-upstream main", {
+    cwd: targetDir,
+    stdio: "ignore",
+  });
+  execSync("git reset cookie-upstream/main", {
+    cwd: targetDir,
+    stdio: "ignore",
+  });
+  execSync("git add -A", { cwd: targetDir, stdio: "ignore" });
+  execSync('git commit -m "Initial project from COOKIE framework"', {
+    cwd: targetDir,
+    stdio: "ignore",
+  });
 } catch {
   // Non-fatal — user can init later
 }
 
 console.log("");
-console.log(green("  Repository cloned successfully!"));
+console.log(green("  Project scaffolded successfully!"));
 console.log("");
 
 // ──────────────────────────────────────────────
