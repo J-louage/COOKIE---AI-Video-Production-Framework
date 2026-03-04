@@ -197,6 +197,29 @@
         </sub_fields>
       </field>
 
+      <field name="production_state_update" type="object" required="false">
+        <description>
+          Records which production_state flags were set and any episode status
+          transition that occurred during FINAL-4 (Update Production State).
+          Present only when the workflow declares production_state_flags and
+          completes with status "success". Used for auditability and by the
+          Director to track cumulative production progress.
+        </description>
+        <sub_fields>
+          <field name="flags_set" type="array">
+            List of production_state flag names that were set to true.
+            Example: ["script_finalized"]
+          </field>
+          <field name="status_transition" type="object">
+            <field name="from" type="string">Previous episode status value.</field>
+            <field name="to" type="string">New episode status value. Same as "from" if no transition occurred.</field>
+          </field>
+          <field name="episode_id" type="string">
+            The episode ID whose production_state was updated.
+          </field>
+        </sub_fields>
+      </field>
+
       <field name="context_carry" type="object" required="false">
         <description>
           Key-value pairs from the workflow context that should be carried

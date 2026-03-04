@@ -4,6 +4,8 @@ module: production
 agent: screenwriter
 slash_command: /production-validate-script
 description: "Validate and normalize user-provided script to canonical format"
+production_state_flags:
+  - "script_finalized"
 config_source: "{project-root}/_cookie/production/config.yaml"
 installed_path: "{project-root}/_cookie/production/workflows/1-ideation/validate-script"
 instructions: "{installed_path}/instructions.xml"

@@ -1186,7 +1186,31 @@
       </invoke-protocol>
     </step>
 
-    <step n="FINAL-4" name="Update Agent Memory">
+    <step n="FINAL-4" name="Update Production State">
+      <action if="final_status == 'success' AND workflow.production_state_flags is defined AND episode_id exists in context">
+        Update the episode's production state flags and optionally transition episode status.
+
+        Procedure:
+        1. READ {episode_path}/episode-config.yaml
+        2. ENSURE the `production_state` block exists. If missing, create it with all 13 flags set to false:
+           script_finalized, characters_created, style_guide_created, ssd_created,
+           ssd_validated, cost_approved, assets_generated, asset_qa_passed,
+           composition_assembled, preview_approved, final_rendered, exports_complete, final_qa_passed
+        3. SET each flag declared in workflow.production_state_flags to true
+        4. EVALUATE status auto-transitions (forward-only):
+           Status ordinals: not-started(0), planning(1), pre-production(2), in-production(3), post-production(4), complete(5)
+           Only transition if new_ordinal > current_ordinal:
+           - script_finalized       → "pre-production"  (ordinal 2)
+           - assets_generated       → "in-production"   (ordinal 3)
+           - composition_assembled  → "post-production"  (ordinal 4)
+           - final_qa_passed        → "complete"          (ordinal 5)
+        5. UPDATE metadata.last_modified to current date
+        6. WRITE updated YAML back to disk
+        7. LOG: "Production state updated: flags={flags_set}, status={old_status} → {new_status}"
+      </action>
+    </step>
+
+    <step n="FINAL-5" name="Update Agent Memory">
       <action if="workflow.agent has a memory sidecar">
         Check if the executing agent has a memory sidecar in _cookie/_memory/.
         If so, append relevant decisions, learnings, and notes to the sidecar.
@@ -1200,7 +1224,7 @@
       </action>
     </step>
 
-    <step n="FINAL-5" name="Present Completion Summary">
+    <step n="FINAL-6" name="Present Completion Summary">
       <template-output critical="true">
         <format>
           ── Workflow Complete ──────────────────────────────────
@@ -1224,6 +1248,11 @@
           {if flagged_assets exist:}
           Flagged Assets (accepted with warnings):
           {for each flagged: "  - {asset_id}: {reason}"}
+
+          {if production_state_updated:}
+          Production State:
+            Flags set:  {production_state_flags_set}
+            Status:     {old_status} → {new_status}
 
           {if next_suggested:}
           Next: {next_suggested_description}
@@ -1487,8 +1516,9 @@
       10. ENFORCE post_complete quality gates
       11. GENERATE cost summary
       12. GENERATE handoff document
-      13. UPDATE agent memory (if applicable)
-      14. PRESENT completion summary
+      13. UPDATE production state (if workflow declares production_state_flags)
+      14. UPDATE agent memory (if applicable)
+      15. PRESENT completion summary
     </lifecycle>
 
     <mode-comparison>

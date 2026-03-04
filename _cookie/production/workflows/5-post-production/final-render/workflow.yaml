@@ -4,6 +4,8 @@ module: production
 agent: editor
 slash_command: /production-final-render
 description: "Render the final full-resolution video from the Remotion composition"
+production_state_flags:
+  - "final_rendered"
 config_source: "{project-root}/_cookie/production/config.yaml"
 installed_path: "{project-root}/_cookie/production/workflows/5-post-production/final-render"
 instructions: "{installed_path}/instructions.xml"

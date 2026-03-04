@@ -4,6 +4,8 @@ module: production
 agent: editor
 slash_command: /production-final-qa
 description: "Perform comprehensive quality assurance on all final exports and generate QA report"
+production_state_flags:
+  - "final_qa_passed"
 config_source: "{project-root}/_cookie/production/config.yaml"
 installed_path: "{project-root}/_cookie/production/workflows/5-post-production/final-qa"
 instructions: "{installed_path}/instructions.xml"

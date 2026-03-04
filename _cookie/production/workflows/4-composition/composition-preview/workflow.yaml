@@ -4,6 +4,8 @@ module: production
 agent: motion-designer
 slash_command: /production-composition-preview
 description: "Render a low-resolution preview of the composition for review and approval"
+production_state_flags:
+  - "preview_approved"
 config_source: "{project-root}/_cookie/production/config.yaml"
 installed_path: "{project-root}/_cookie/production/workflows/4-composition/composition-preview"
 instructions: "{installed_path}/instructions.xml"

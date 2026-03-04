@@ -4,6 +4,9 @@ module: production
 agent: storyboard-artist
 slash_command: /production-pre-production-review
 description: "Final pre-production review gate before asset generation"
+production_state_flags:
+  - "ssd_validated"
+  - "cost_approved"
 config_source: "{project-root}/_cookie/production/config.yaml"
 installed_path: "{project-root}/_cookie/production/workflows/2-pre-production/pre-production-review"
 instructions: "{installed_path}/instructions.xml"

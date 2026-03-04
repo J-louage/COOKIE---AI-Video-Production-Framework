@@ -4,6 +4,8 @@ module: production
 agent: character-designer
 slash_command: /production-create-style-guide
 description: "Create project visual style guide with VEO/Nano Banana tokens"
+production_state_flags:
+  - "style_guide_created"
 config_source: "{project-root}/_cookie/production/config.yaml"
 installed_path: "{project-root}/_cookie/production/workflows/2-pre-production/create-style-guide"
 instructions: "{installed_path}/instructions.xml"

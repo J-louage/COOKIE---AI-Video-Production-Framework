@@ -4,6 +4,8 @@ module: production
 agent: editor
 slash_command: /production-multi-format-export
 description: "Export the final video in multiple formats and aspect ratios for different platforms"
+production_state_flags:
+  - "exports_complete"
 config_source: "{project-root}/_cookie/production/config.yaml"
 installed_path: "{project-root}/_cookie/production/workflows/5-post-production/multi-format-export"
 instructions: "{installed_path}/instructions.xml"
