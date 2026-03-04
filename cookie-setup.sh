@@ -58,22 +58,55 @@ echo ""
 # ──────────────────────────────────────────────
 # Check for updates
 # ──────────────────────────────────────────────
-if git rev-parse --is-inside-work-tree &>/dev/null; then
-    printf "${BOLD}Check for updates${NC}\n\n"
-    printf "  Would you like to pull the latest framework updates from the repository? (y/N): "
-    read -r PULL_UPDATES </dev/tty
-    echo ""
-    if [[ "$PULL_UPDATES" =~ ^[Yy]$ ]]; then
-        info "Fetching latest changes..."
-        if git fetch origin 2>/dev/null; then
-            LOCAL=$(git rev-parse HEAD 2>/dev/null)
-            REMOTE=$(git rev-parse "@{u}" 2>/dev/null || echo "")
-            if [[ -z "$REMOTE" ]]; then
-                warn "No upstream branch configured — skipping update"
-            elif [[ "$LOCAL" == "$REMOTE" ]]; then
-                success "Already up to date!"
-            else
-                BEHIND=$(git rev-list --count HEAD.."@{u}" 2>/dev/null || echo "0")
+FRAMEWORK_REPO="https://github.com/J-louage/COOKIE---AI-Video-Production-Framework.git"
+FRAMEWORK_REMOTE="cookie-upstream"
+
+printf "${BOLD}Check for updates${NC}\n\n"
+
+# Initialize git repo if not already one
+if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    info "Initializing git repository..."
+    git init --quiet
+    success "Git repository initialized"
+fi
+
+# Ensure the framework upstream remote exists
+CURRENT_UPSTREAM_URL=$(git remote get-url "$FRAMEWORK_REMOTE" 2>/dev/null || echo "")
+if [[ -z "$CURRENT_UPSTREAM_URL" ]]; then
+    info "Adding COOKIE framework remote ($FRAMEWORK_REMOTE)..."
+    git remote add "$FRAMEWORK_REMOTE" "$FRAMEWORK_REPO"
+    success "Framework remote added"
+elif [[ "$CURRENT_UPSTREAM_URL" != "$FRAMEWORK_REPO" ]]; then
+    info "Updating framework remote URL..."
+    git remote set-url "$FRAMEWORK_REMOTE" "$FRAMEWORK_REPO"
+    success "Framework remote URL updated"
+fi
+
+printf "\n  Would you like to pull the latest framework updates? (y/N): "
+read -r PULL_UPDATES </dev/tty
+echo ""
+if [[ "$PULL_UPDATES" =~ ^[Yy]$ ]]; then
+    info "Fetching latest changes from COOKIE framework..."
+    if git fetch "$FRAMEWORK_REMOTE" 2>/dev/null; then
+        # Determine the default branch on the framework remote
+        FRAMEWORK_BRANCH=$(git remote show "$FRAMEWORK_REMOTE" 2>/dev/null | grep "HEAD branch" | awk '{print $NF}')
+        if [[ -z "$FRAMEWORK_BRANCH" ]]; then
+            FRAMEWORK_BRANCH="main"
+        fi
+
+        LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "")
+        REMOTE=$(git rev-parse "$FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH" 2>/dev/null || echo "")
+
+        if [[ -z "$LOCAL" ]]; then
+            # Fresh repo with no commits — pull everything
+            info "First-time setup — pulling framework files..."
+            git pull "$FRAMEWORK_REMOTE" "$FRAMEWORK_BRANCH" 2>/dev/null
+            success "Framework files downloaded"
+        elif [[ "$LOCAL" == "$REMOTE" ]]; then
+            success "Already up to date!"
+        else
+            BEHIND=$(git rev-list --count HEAD.."$FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH" 2>/dev/null || echo "0")
+            if [[ "$BEHIND" -gt 0 ]]; then
                 info "$BEHIND new commit(s) available — pulling..."
                 # Stash any local changes (e.g. global.yaml edited by previous setup)
                 STASHED=false
@@ -81,11 +114,11 @@ if git rev-parse --is-inside-work-tree &>/dev/null; then
                     info "Stashing local changes before update..."
                     git stash push -m "cookie-setup: auto-stash before update" --quiet 2>/dev/null && STASHED=true
                 fi
-                if git pull --ff-only 2>/dev/null; then
+                if git pull --ff-only "$FRAMEWORK_REMOTE" "$FRAMEWORK_BRANCH" 2>/dev/null; then
                     success "Updated to latest version"
                 else
-                    warn "Could not fast-forward — you may have diverged from the remote"
-                    info "Run 'git pull' manually to resolve"
+                    warn "Could not fast-forward — your local changes may have diverged"
+                    info "You can try: git merge $FRAMEWORK_REMOTE/$FRAMEWORK_BRANCH"
                 fi
                 # Restore stashed changes
                 if [[ "$STASHED" == true ]]; then
@@ -97,18 +130,18 @@ if git rev-parse --is-inside-work-tree &>/dev/null; then
                         info "Run 'git stash pop' after resolving any conflicts"
                     fi
                 fi
+            else
+                success "Already up to date!"
             fi
-        else
-            warn "Could not reach remote — continuing with current version"
         fi
     else
-        info "Skipping update check"
+        warn "Could not reach framework remote — continuing with current version"
+        info "Check your internet connection or try again later"
     fi
-    echo ""
 else
-    info "Not a git repository — skipping update check"
-    echo ""
+    info "Skipping update check"
 fi
+echo ""
 
 # ──────────────────────────────────────────────
 # Dependency checks
