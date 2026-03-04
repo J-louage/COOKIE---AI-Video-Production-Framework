@@ -74,12 +74,28 @@ if git rev-parse --is-inside-work-tree &>/dev/null; then
                 success "Already up to date!"
             else
                 BEHIND=$(git rev-list --count HEAD.."@{u}" 2>/dev/null || echo "0")
-                info "$BEHIND new commit(s) available"
+                info "$BEHIND new commit(s) available — pulling..."
+                # Stash any local changes (e.g. global.yaml edited by previous setup)
+                STASHED=false
+                if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+                    info "Stashing local changes before update..."
+                    git stash push -m "cookie-setup: auto-stash before update" --quiet 2>/dev/null && STASHED=true
+                fi
                 if git pull --ff-only 2>/dev/null; then
                     success "Updated to latest version"
                 else
-                    warn "Fast-forward merge not possible — you may have local changes"
+                    warn "Could not fast-forward — you may have diverged from the remote"
                     info "Run 'git pull' manually to resolve"
+                fi
+                # Restore stashed changes
+                if [[ "$STASHED" == true ]]; then
+                    info "Restoring your local changes..."
+                    if git stash pop --quiet 2>/dev/null; then
+                        success "Local changes restored"
+                    else
+                        warn "Could not auto-restore — your changes are saved in 'git stash'"
+                        info "Run 'git stash pop' after resolving any conflicts"
+                    fi
                 fi
             fi
         else
