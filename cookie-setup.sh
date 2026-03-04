@@ -56,6 +56,45 @@ success "Running from project root: $(pwd)"
 echo ""
 
 # ──────────────────────────────────────────────
+# Check for updates
+# ──────────────────────────────────────────────
+if git rev-parse --is-inside-work-tree &>/dev/null; then
+    printf "${BOLD}Check for updates${NC}\n\n"
+    printf "  Would you like to pull the latest framework updates from the repository? (y/N): "
+    read -r PULL_UPDATES </dev/tty
+    echo ""
+    if [[ "$PULL_UPDATES" =~ ^[Yy]$ ]]; then
+        info "Fetching latest changes..."
+        if git fetch origin 2>/dev/null; then
+            LOCAL=$(git rev-parse HEAD 2>/dev/null)
+            REMOTE=$(git rev-parse "@{u}" 2>/dev/null || echo "")
+            if [[ -z "$REMOTE" ]]; then
+                warn "No upstream branch configured — skipping update"
+            elif [[ "$LOCAL" == "$REMOTE" ]]; then
+                success "Already up to date!"
+            else
+                BEHIND=$(git rev-list --count HEAD.."@{u}" 2>/dev/null || echo "0")
+                info "$BEHIND new commit(s) available"
+                if git pull --ff-only 2>/dev/null; then
+                    success "Updated to latest version"
+                else
+                    warn "Fast-forward merge not possible — you may have local changes"
+                    info "Run 'git pull' manually to resolve"
+                fi
+            fi
+        else
+            warn "Could not reach remote — continuing with current version"
+        fi
+    else
+        info "Skipping update check"
+    fi
+    echo ""
+else
+    info "Not a git repository — skipping update check"
+    echo ""
+fi
+
+# ──────────────────────────────────────────────
 # Dependency checks
 # ──────────────────────────────────────────────
 printf "${BOLD}Checking dependencies...${NC}\n\n"
