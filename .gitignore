@@ -24,3 +24,7 @@ _cookie/_cost/reports/*.yaml
 # Episode output artifacts
 episodes/*/output/
 episodes/*/assets/generated/
+
+# Dashboard build output
+dashboard/.next/
+dashboard/.env.local
