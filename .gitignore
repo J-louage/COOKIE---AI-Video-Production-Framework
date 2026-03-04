@@ -28,3 +28,4 @@ episodes/*/assets/generated/
 # Dashboard build output
 dashboard/.next/
 dashboard/.env.local
+dashboard/.dashboard.pid

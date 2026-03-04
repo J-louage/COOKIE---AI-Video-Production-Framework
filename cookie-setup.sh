@@ -316,6 +316,73 @@ fi
 echo ""
 
 # ──────────────────────────────────────────────
+# Production Dashboard
+# ──────────────────────────────────────────────
+DASHBOARD_DIR="dashboard"
+if [[ -f "$DASHBOARD_DIR/package.json" ]]; then
+    printf "${BOLD}Production Dashboard${NC}\n\n"
+    info "The COOKIE Dashboard is a web app for browsing your production data."
+    echo ""
+    printf "  Would you like to install and start the dashboard? (Y/n): "
+    read -r INSTALL_DASHBOARD </dev/tty
+    echo ""
+    if [[ ! "$INSTALL_DASHBOARD" =~ ^[Nn]$ ]]; then
+        # Install dependencies
+        info "Installing dashboard dependencies..."
+        if (cd "$DASHBOARD_DIR" && npm install --silent 2>/dev/null); then
+            success "Dashboard dependencies installed"
+        else
+            warn "npm install failed in $DASHBOARD_DIR — you can run it manually later"
+        fi
+
+        # Create .env.local if missing
+        if [[ ! -f "$DASHBOARD_DIR/.env.local" ]]; then
+            echo "COOKIE_PROJECT_ROOT=.." > "$DASHBOARD_DIR/.env.local"
+            success "Dashboard .env.local created"
+        fi
+
+        # Find an available port (default 3000, then try 3001-3009)
+        DASHBOARD_PORT=3000
+        for PORT_CANDIDATE in 3000 3001 3002 3003 3004 3005 3006 3007 3008 3009; do
+            if ! lsof -i ":$PORT_CANDIDATE" &>/dev/null; then
+                DASHBOARD_PORT=$PORT_CANDIDATE
+                break
+            fi
+        done
+
+        # Start the dashboard in the background
+        printf "  Would you like to start the dashboard now on port $DASHBOARD_PORT? (Y/n): "
+        read -r START_DASHBOARD </dev/tty
+        echo ""
+        if [[ ! "$START_DASHBOARD" =~ ^[Nn]$ ]]; then
+            info "Starting dashboard on port $DASHBOARD_PORT..."
+            (cd "$DASHBOARD_DIR" && PORT=$DASHBOARD_PORT npm run dev &>/dev/null &)
+            DASHBOARD_PID=$!
+            sleep 3
+            if kill -0 $DASHBOARD_PID 2>/dev/null; then
+                success "Dashboard running at http://localhost:$DASHBOARD_PORT"
+                info "The dashboard runs in the background. To stop it: kill $DASHBOARD_PID"
+                # Save PID for reference
+                echo "$DASHBOARD_PID" > "$DASHBOARD_DIR/.dashboard.pid"
+            else
+                warn "Dashboard failed to start — run it manually: cd dashboard && npm run dev"
+            fi
+        else
+            info "Skipping dashboard start"
+            echo ""
+            info "To start it later:"
+            printf "       ${CYAN}cd dashboard && npm run dev${NC}\n"
+        fi
+    else
+        info "Skipping dashboard installation"
+    fi
+    echo ""
+else
+    info "Dashboard not found — skipping"
+    echo ""
+fi
+
+# ──────────────────────────────────────────────
 # Success
 # ──────────────────────────────────────────────
 printf "${BOLD}${GREEN}"
@@ -337,5 +404,10 @@ echo ""
 echo "    3. Or jump straight to making a video:"
 printf "       ${CYAN}/cookie-quick-video${NC}\n"
 echo ""
+if [[ -f "$DASHBOARD_DIR/package.json" ]]; then
+echo "    4. View your production dashboard:"
+printf "       ${CYAN}cd dashboard && npm run dev${NC}\n"
+echo ""
+fi
 echo "  Run /cookie-help inside Claude Code for all available commands."
 echo ""

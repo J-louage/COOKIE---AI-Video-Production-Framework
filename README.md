@@ -43,7 +43,8 @@ The setup script will:
 1. Check all dependencies are installed
 2. Ask for your name and API keys
 3. Install VEO skill dependencies
-4. Configure everything automatically
+4. Install and start the Production Dashboard
+5. Configure everything automatically
 
 Then inside Claude Code:
 
@@ -223,6 +224,92 @@ Lower files override higher ones.
 | `/cookie-continuity` | Check visual continuity across scenes |
 | `/cookie-validate-framework` | Scan framework for consistency |
 
+## Production Dashboard
+
+COOKIE includes a read-only web dashboard for browsing all production data — episodes, characters, scripts, scene specs, assets, costs, agent manifests, and configuration. No database required; it reads directly from your project files.
+
+### Starting the Dashboard
+
+The setup script (`bash cookie-setup.sh`) installs and starts the dashboard automatically. To start it manually:
+
+```bash
+cd dashboard
+npm run dev
+```
+
+The dashboard opens at **http://localhost:3000** by default.
+
+### Running Multiple Projects
+
+Each COOKIE project has its own dashboard. If you're working on multiple projects simultaneously, each one needs a different port:
+
+```bash
+# Project A (default port)
+cd ~/projects/project-a/dashboard
+npm run dev
+# → http://localhost:3000
+
+# Project B (custom port)
+cd ~/projects/project-b/dashboard
+PORT=3001 npm run dev
+# → http://localhost:3001
+
+# Project C (custom port)
+cd ~/projects/project-c/dashboard
+PORT=3002 npm run dev
+# → http://localhost:3002
+```
+
+The setup script detects occupied ports and automatically picks the next available one (3000–3009).
+
+### Restarting a Stopped Dashboard
+
+If the dashboard was stopped or you closed the terminal:
+
+```bash
+cd dashboard
+npm run dev
+```
+
+Or with a specific port:
+
+```bash
+cd dashboard
+PORT=3001 npm run dev
+```
+
+To run it in the background:
+
+```bash
+cd dashboard
+PORT=3000 npm run dev &
+```
+
+### Dashboard Pages
+
+| Page | URL | What It Shows |
+|------|-----|--------------|
+| Home | `/` | Project stats, episode grid, budget progress |
+| Episodes | `/episodes` | Episode list with status badges and progress bars |
+| Episode Detail | `/episodes/[id]` | 7 tabs: Overview, Script, SSD, Style Guide, Assets, Costs, Config |
+| Characters | `/characters` | Character gallery cards, brand config (colors, fonts) |
+| Character Detail | `/characters/[id]` | Physical traits, voice config, prompt tokens, reference images |
+| Costs | `/costs` | Budget vs actual charts, per-episode and per-tool breakdowns, pricing |
+| Agents | `/agents` | 13 agents, 38 workflows by phase, 10 tasks, 8 skills, memory sidecars |
+| Config | `/config` | Configuration hierarchy, resolution profiles, format presets |
+
+### Stopping the Dashboard
+
+If you started the dashboard in the background:
+
+```bash
+# If the PID file exists
+kill $(cat dashboard/.dashboard.pid)
+
+# Or find and kill the process
+lsof -ti :3000 | xargs kill
+```
+
 ## FAQ
 
 ### I ran a command but nothing happened
@@ -288,6 +375,12 @@ Run `/cookie-extend-plan` to analyze your existing video and plan new scenes wit
 - Check `identity.json` for correct trait descriptions
 - Ensure all scenes reference the same character ID in the SSD
 
+### Dashboard won't start
+- Run `cd dashboard && npm install` to ensure dependencies are installed
+- Check if the port is already in use: `lsof -i :3000` — use a different port with `PORT=3001 npm run dev`
+- Verify Node.js 18+ is installed: `node -v`
+- If you see "module not found" errors, delete `dashboard/node_modules` and run `npm install` again
+
 ### Remotion render fails
 - Requires Node.js 18+
 - Run `npm install` in the Remotion project directory
@@ -309,6 +402,7 @@ project-root/
 │   └── skills/               # Tool skills (VEO, ElevenLabs, etc.)
 ├── .claude/
 │   └── commands/             # All /cookie-* slash commands
+├── dashboard/                # Production Dashboard (Next.js web app)
 ├── characters/               # Character definitions and references
 ├── shared-assets/            # Cross-episode assets
 ├── episodes/                 # Per-episode production files
